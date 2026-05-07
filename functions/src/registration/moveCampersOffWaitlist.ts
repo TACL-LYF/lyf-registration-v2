@@ -1,0 +1,112 @@
+import {addDays} from "date-fns";
+import {formatInTimeZone} from "date-fns-tz";
+import {logger} from "firebase-functions";
+import {onCall} from "firebase-functions/v2/https";
+import * as Mustache from "mustache";
+import * as fs from "fs";
+import * as path from "path";
+
+import {
+  combineNames,
+  emailTransport,
+  getFirestoreDb,
+  getFirstName,
+  REGISTRATION_EMAIL,
+} from "../utils";
+import {
+  RegistrationStatus,
+  MoveCampersOffWaitlistRequest,
+} from "lyf-registration-schemas";
+import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
+import mjml2html from "mjml";
+
+// Ensure that all variables wrapped in {{}} are represented here
+type BodyTemplateInput = {
+  campYear: number;
+  parentNames: string;
+  registrationDate: string;
+  camperName: string;
+  campTrack: string;
+};
+
+const mjmlTemplate = fs.readFileSync(
+  path.resolve(__dirname, "../emailTemplates/offWaitlistTemplate.mjml"),
+  {encoding: "utf8"}
+);
+
+const htmlTemplate = mjml2html(mjmlTemplate, {
+  minify: true, // Making it smalle rto save on email file size
+}).html;
+
+/**
+ * Moves campers off of the waitlist by marking their registration as pending payment and sending
+ * an email to the parent informing their campers are off the waitlist.
+ */
+export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
+  {cors: true},
+  async (request) => {
+    // If the user isn't signed in, then this isn't a valid request.
+    if (!request.auth) {
+      return {
+        status: "error",
+        code: 401,
+        message: "Not signed in",
+      };
+    }
+
+    const {
+      parentNames,
+      parentEmails,
+      campYear,
+      camperName,
+      registrationId,
+      campTrack,
+      isTestData,
+    } = request.data;
+
+    const db = getFirestoreDb(!isTestData);
+
+    const parentFirstNames = combineNames(
+      parentNames.map((p) => getFirstName(p))
+    );
+
+    // Mark registrations as pending payment so that they'll pass through our createRegistrationSession function.
+    try {
+      await db
+        .doc(`camps/${campYear}/registrations/${registrationId}`)
+        .update({status: RegistrationStatus.PENDING_PAYMENT});
+    } catch (e) {
+      logger.error(e);
+      sendMessageToRegistrationErrorMessages(
+        `Failed to move campers off waitlist: ${camperName}`
+      );
+      return {
+        status: "error",
+        code: 402,
+        message: "Failed to move campers off waitlist",
+      };
+    }
+
+    // Send moved off waitlist email
+    const templateInput: BodyTemplateInput = {
+      campYear: campYear,
+      parentNames: parentFirstNames,
+      registrationDate: formatInTimeZone(
+        addDays(new Date(), 7),
+        "America/Los_Angeles",
+        "EEEE MMM do, Y"
+      ),
+      camperName: camperName,
+      campTrack: campTrack,
+    };
+
+    const htmlBody = Mustache.render(htmlTemplate, templateInput);
+
+    return emailTransport.sendMail({
+      from: `TACL-LYF <${REGISTRATION_EMAIL}>`,
+      to: parentEmails,
+      subject: `[TACL LYF] Congrats - ${camperName} is off the waitlist! Finish registration now to secure your spot!`,
+      html: htmlBody,
+    });
+  }
+);

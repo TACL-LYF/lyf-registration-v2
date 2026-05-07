@@ -1,0 +1,110 @@
+<mjml>
+  <mj-head>
+    <mj-title
+      >[TACL-LYF Camp {{campYear}}] Congratulations {{camperName}} is off the waitlist!</mj-title
+    >
+    <mj-preview
+      >[TACL-LYF Camp {{campYear}}] Congratulations {{camperName}} is off the waitlist!</mj-preview
+    >
+    <mj-attributes>
+      <mj-all
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+      ></mj-all>
+      <mj-text
+        font-weight="400"
+        font-size="16px"
+        color="#000000"
+        line-height="24px"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+      ></mj-text>
+    </mj-attributes>
+  </mj-head>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-image
+          src="https://mcusercontent.com/723f6baf2c99017f0ff638067/_compresseds/e3a31227-4ec5-6864-fb06-6cf57a124b1c.jpg"
+        ></mj-image>
+
+        <mj-text font-size="24px" font-family="helvetica" font-weight="bold"
+          >Dear {{parentNames}},</mj-text
+        >
+
+        <mj-text
+          >Congratulations, <strong>{{camperName}}</strong> has gotten off the waitlist for the
+          <strong>{{campTrack}}</strong> camp track! To secure their spot, please complete
+          registration within 7 days (by {{registrationDate}}), otherwise {{camperName}}’s
+          spot will be released to the next camper on the waitlist.</mj-text
+        >
+
+        <mj-text
+          ><strong>To complete registration for TACL-LYF {{campYear}} Camp, please head to our</strong>
+          <a href="https://lyf-registration.tacl.org/user/profile/">registration dashboard</a> <strong>
+          to submit payment.</strong>
+        </mj-text
+        >
+
+        <mj-text>For cancellations or questions, please contact us at <a href="mailto:lyf@tacl.org">lyf@tacl.org</a>.
+        If you have any questions or concerns, please do not hesitate to reach out!</mj-text>
+
+        <mj-text font-size="24px" font-family="helvetica" font-weight="bold"
+          >Warm regards,</mj-text
+        >
+        <mj-text font-size="24px" font-family="helvetica" font-weight="bold" line-height=0.1
+          >LYF Staff</mj-text
+        >
+
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-image
+          src="https://mcusercontent.com/723f6baf2c99017f0ff638067/images/6189858c-5375-fad9-b62c-3cee7ba86086.jpg"
+        ></mj-image>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-divider
+          padding="0"
+          border-color="lightgrey"
+          border-width="2px"
+        ></mj-divider>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#404040">
+      <mj-column>
+        <mj-text color="#F2F2F2" align="center"
+          >Taiwanese American Citizens League - Leading Youth Forward | TACL-LYF
+          is a 501(c)(3) nonprofit organization through its parent organization
+          Taiwanese American Citizens League.</mj-text
+        >
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-social align="center">
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-facebook-48.png"
+            href="https://www.facebook.com/tacl.lyf/"
+          ></mj-social-element>
+
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-instagram-48.png"
+            href="https://www.instagram.com/tacllyf/"
+          ></mj-social-element>
+
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-link-48.png"
+            name="link"
+            href="https://lin.ee/8zWlnfM"
+          ></mj-social-element>
+        </mj-social>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

@@ -1,0 +1,72 @@
+{
+  "name": "lyf-registration-website",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Registration website for TACL LYF",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "author": "Stephan Loh",
+  "keywords": [
+    "gatsby"
+  ],
+  "scripts": {
+    "develop": "gatsby develop",
+    "start": "gatsby develop",
+    "build": "gatsby build",
+    "serve": "gatsby serve",
+    "clean": "gatsby clean",
+    "clean-dev": "gatsby clean && gatsby develop",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.10.5",
+    "@emotion/styled": "^11.10.5",
+    "@fontsource/nunito": "^5.0.1",
+    "@mui/base": "^5.0.0-beta.70",
+    "@mui/icons-material": "^7.0.0",
+    "@mui/material": "^7.0.0",
+    "@mui/x-data-grid": "^7.28.0",
+    "@mui/x-date-pickers": "^7.28.0",
+    "@nivo/core": "^0.83.0",
+    "@nivo/pie": "^0.83.0",
+    "@nodeguy/server-date": "^5.1.0",
+    "@react-spring/web": "^9.5.5",
+    "@sentry/gatsby": "^10.36.0",
+    "@stripe/stripe-js": "^3.5.0",
+    "@use-gesture/react": "^10.3.1",
+    "country-list": "^2.3.0",
+    "cross-env": "^7.0.3",
+    "dayjs": "^1.11.8",
+    "dotenv": "^16.0.3",
+    "firebase": "^10.12.2",
+    "gatsby": "^5.0.0",
+    "gatsby-omni-font-loader": "^2.0.2",
+    "gatsby-plugin-google-analytics": "^5.0.0",
+    "gatsby-plugin-image": "^3.0.0",
+    "gatsby-plugin-manifest": "^5.10.0",
+    "gatsby-plugin-sharp": "^5.0.0",
+    "gatsby-source-filesystem": "^5.0.0",
+    "gatsby-transformer-sharp": "^5.0.0",
+    "lyf-registration-schemas": "1.0.0",
+    "react": "^18.2.0",
+    "react-confetti-explosion": "^2.1.2",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-dom": "^18.2.0",
+    "react-firebase-hooks": "^5.1.1",
+    "react-helmet": "^6.1.0",
+    "react-spring-scroll-to-hook": "^1.0.3",
+    "small-group-pairing": "1.0.0",
+    "states-us": "^1.0.4",
+    "html-to-image": "^1.11.11",
+    "file-saver": "^2.0.5"
+  },
+  "devDependencies": {
+    "@types/country-list": "^2.1.4",
+    "@types/node": "^20.2.5",
+    "@types/react": "^18.0.25",
+    "@types/react-dom": "^18.0.8",
+    "typescript": "^5.0.4"
+  }
+}

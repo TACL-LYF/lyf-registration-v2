@@ -1,0 +1,1 @@
+{"version":3,"file":"getStripeCustomerId.d.ts","sourceRoot":"","sources":["../../src/registrationUtils/getStripeCustomerId.ts"],"names":[],"mappings":"AAAA,OAAO,EAAC,iBAAiB,EAAC,MAAM,0BAA0B,CAAC;AAM3D;;;;;GAKG;AACH,wBAAsB,mBAAmB,CACvC,SAAS,EAAE,iBAAiB,GAAG,SAAS,EACxC,KAAK,EAAE,MAAM,EACb,UAAU,GAAE,OAAe,GAC1B,OAAO,CAAC,MAAM,CAAC,CAyCjB"}

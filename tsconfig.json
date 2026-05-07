@@ -1,0 +1,22 @@
+{
+  "exclude": ["schemas/lib", "**/node_modules"],
+  "include": [],
+  "files": [],
+  "references": [
+    {
+      "path": "./functions"
+    },
+    {
+      "path": "./schemas"
+    },
+    {
+      "path": "./scripts"
+    },
+    {
+      "path": "./website"
+    },
+    {
+      "path": "./small-group-pairing"
+    }
+  ]
+}

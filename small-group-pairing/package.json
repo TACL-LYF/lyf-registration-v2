@@ -1,0 +1,24 @@
+{
+  "name": "small-group-pairing",
+  "version": "1.0.0",
+  "description": "Small group pairing module for a summer camp",
+  "main": "dist/src/index",
+  "types": "dist/src/index",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "build": "tsc --build --force tsconfig.json",
+    "test": "yarn run build && prettier tests/* --write && jest"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/jest": "^29.5.14",
+    "jest": "^29.7.0",
+    "prettier": "^3.4.2",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.2"
+  }
+}

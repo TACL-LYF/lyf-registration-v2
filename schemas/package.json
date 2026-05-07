@@ -1,0 +1,17 @@
+{
+    "name": "lyf-registration-schemas",
+    "version": "1.0.0",
+    "main": "dist/index",
+    "types": "dist/index",
+    "private": true,
+    "scripts": {
+        "build": "tsc"
+    },
+    "dependencies": {
+        "cross-env": "^7.0.3",
+        "firebase": "^10.6.0"
+    },
+    "devDependencies": {
+        "typescript": "^5.3.2"
+    }
+}

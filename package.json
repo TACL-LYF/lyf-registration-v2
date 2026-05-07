@@ -1,0 +1,28 @@
+{
+  "name": "lyf-registration",
+  "version": "1.0.0",
+  "repository": "git@github.com:TACL-LYF/lyf-registration.git",
+  "author": "TACL LYF <lyf.technology@tacl.org>",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "postinstall": "husky",
+    "compile": "tsc --build --force tsconfig.json"
+  },
+  "workspaces": [
+    "functions",
+    "schemas",
+    "scripts",
+    "small-group-pairing",
+    "website"
+  ],
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7"
+  },
+  "lint-staged": {
+    "*.{js,jsx,ts,tsx}": [
+      "prettier --check --ignore-unknown"
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+node_modules/
+tsconfig.tsbuildinfo
+# Need to include the built folder in order for netlify to deploy
+# dist/

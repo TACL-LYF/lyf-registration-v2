@@ -1,0 +1,468 @@
+import React from "react"
+import { PageProps } from "gatsby"
+import dayjs from "dayjs"
+import { updateDoc } from "firebase/firestore"
+import { Box, Chip, Stack, Tooltip, Typography, useTheme } from "@mui/material"
+import {
+  DataGrid,
+  GridColumnVisibilityModel,
+  GridColDef,
+  GridRenderCellParams,
+  GridToolbar,
+  GridActionsCellItem,
+  GridRowEditStopReasons,
+  GridRowId,
+  GridRowModes,
+  GridRowModesModel,
+} from "@mui/x-data-grid"
+import EditIcon from "@mui/icons-material/Edit"
+import RestoreIcon from "@mui/icons-material/Restore"
+import SaveIcon from "@mui/icons-material/Save"
+
+// Utils
+import getPageTitle from "@utils/getPageTitle"
+import AuthContext from "@components/Auth/AuthContext"
+import ProdContext from "@components/ProdContext"
+
+// Components
+import PrivateRoute from "@components/Auth/PrivateRoute"
+import { Section } from "@components/Layout"
+import { SnackbarAlertProvider } from "@components/SnackbarAlert"
+import useFamilyData from "@hooks/useFamilyData"
+import { CampTrack, RegistrationStatus } from "lyf-registration-schemas"
+import { DataGridColumnAlign } from "@components/Table"
+import { OffWaitlistDialog } from "@components/Profile"
+
+export type ParentDashboardRow = {
+  registrationId: string
+  camperId: string
+  year: string
+  firstName: string
+  name: string
+  gender: string
+  birthday: string
+  grade: number
+  shirtSize: string
+  dietAndFoodAllergies: string
+  medicalConditions: string
+  createdAt: string | Date
+  campTrack: CampTrack | "N/A"
+  status: (number | RegistrationStatus | CampTrack)[]
+  isPreRegistered: boolean
+}
+
+const columns: GridColDef[] = [
+  {
+    field: "year",
+    headerName: "Year",
+    minWidth: 50,
+    maxWidth: 755,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "name",
+    headerName: "Camper Name",
+    minWidth: 130,
+    maxWidth: 250,
+    flex: 0.25,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "gender",
+    headerName: "Gender",
+    minWidth: 130,
+    maxWidth: 200,
+    flex: 0.25,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "birthday",
+    headerName: "Birthday",
+    width: 100,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "grade",
+    headerName: "Grade",
+    width: 75,
+    type: "singleSelect",
+    valueOptions: [...Array(13).keys()].filter((g) => g >= 4),
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "createdAt",
+    headerName: "Created At",
+    type: "dateTime",
+    minWidth: 100,
+    width: 150,
+    flex: 0.5,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "campTrack",
+    headerName: "Camp Track",
+    type: "string",
+    minWidth: 100,
+    maxWidth: 100,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "status",
+    headerName: "Status",
+    renderCell: (
+      params: GridRenderCellParams<
+        any,
+        [RegistrationStatus, number | null, CampTrack]
+      >
+    ) => {
+      const [status, waitlistPosition, campTrack] = params.value
+
+      const chipColor = (() => {
+        switch (status) {
+          case RegistrationStatus.ACTIVE:
+            return "primary"
+          case RegistrationStatus.CANCELLED:
+            return "secondary"
+          default:
+            return "default"
+        }
+      })()
+
+      return (
+        <Stack sx={{ padding: 1.2 }}>
+          <Chip
+            label={
+              status !== RegistrationStatus.WAITLIST
+                ? status
+                : `Waitlist for ${campTrack} camp track`
+            }
+            color={chipColor}
+            size="medium"
+            sx={{ width: 1 }}
+          />
+        </Stack>
+      )
+    },
+    minWidth: 200,
+    maxWidth: 400,
+    flex: 0.8,
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "isPreRegistered",
+    headerName: "Pre-Registered",
+    type: "boolean",
+    minWidth: 50,
+    width: 135,
+  },
+]
+
+const editableColumns: GridColDef[] = [
+  {
+    field: "shirtSize",
+    headerName: "T-Shirt Size",
+    width: 100,
+    type: "singleSelect",
+    valueOptions: ["XS", "S", "M", "L", "XL", "XXL", "XXXL"],
+    headerClassName: "editable--header",
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "dietAndFoodAllergies",
+    headerName: "Diet/Food Allergy",
+    minWidth: 150,
+    maxWidth: 250,
+    flex: 0.5,
+    headerClassName: "editable--header",
+    ...DataGridColumnAlign,
+  },
+  {
+    field: "medicalConditions",
+    headerName: "Medical Conditions",
+    minWidth: 150,
+    maxWidth: 250,
+    flex: 0.5,
+    headerClassName: "editable--header",
+    ...DataGridColumnAlign,
+  },
+]
+
+const ProfilePage: React.FC<PageProps> = () => {
+  const { isSignedIn, user } = React.useContext(AuthContext)
+  const { firestore } = React.useContext(ProdContext)
+  const currentYear = dayjs().year()
+  const [familyData, loading, _] = useFamilyData({
+    isSignedIn,
+    user,
+    campYear: currentYear.toString(),
+    firestore,
+    includeWaitlistPosition: false, // Changed in 2026 to no longer include waitlist position
+  })
+  const campers = new Map(familyData.campers.map((c) => [c.ref.path, c]))
+  const theme = useTheme()
+  const [shouldShowOffWaitlistDialog, setShouldShowOffWaitlistDialog] =
+    React.useState(false)
+
+  const getRowsForYear = (lowerBound: number, upperBound: number) => {
+    const rows: ParentDashboardRow[] = Array.from(familyData.registrations)
+      .filter(([, reg]) => {
+        const year = parseInt(reg.campYear)
+        return year >= lowerBound && year <= upperBound
+      })
+      .map(([, reg], index) => {
+        const camper = campers.get(reg.camper.path)
+        return {
+          id: index.toString(),
+          registrationId: reg.ref.path,
+          camperId: camper.ref.path,
+          year: reg.campYear,
+          firstName: camper.firstName ?? "",
+          name: `${camper.firstName} ${camper.lastName}`,
+          gender: camper.gender?.join(", ") || "",
+          birthday: camper.birthDate,
+          grade: reg.grade,
+          shirtSize: reg.shirtSize || "",
+          dietAndFoodAllergies: camper.dietAndFoodAllergies || "",
+          medicalConditions: camper.medicalConditions || "",
+          createdAt: reg.createdAt?.toDate() || "",
+          campTrack: reg.campTrack || "N/A",
+          status: [reg.status, reg.waitlistPosition, reg.campTrack],
+          isPreRegistered: reg.isPreRegistered ?? false,
+        }
+      })
+    return rows
+  }
+
+  const curRows = getRowsForYear(currentYear, currentYear)
+  const prevRows = getRowsForYear(dayjs(0).year(), currentYear - 1)
+
+  // Keep track of all the campers from this year who have been moved off the waitlist
+  // and Pending Payment.
+  const pendingPaymentRows = curRows.filter(
+    (reg) => reg.status[0] === RegistrationStatus.PENDING_PAYMENT
+  )
+
+  React.useEffect(() => {
+    setShouldShowOffWaitlistDialog(pendingPaymentRows.length > 0)
+  }, [curRows])
+
+  const [columnVisibilityModel, setColumnVisibilityModel] =
+    React.useState<GridColumnVisibilityModel>({
+      year: false,
+      shirtSize: true,
+      gender: false,
+      birthday: false,
+      createdAt: false,
+      dietAndFoodAllergies: false,
+      medicalConditions: false,
+    })
+
+  const [prevColumnVisibilityModel, setPrevColumnVisibilityModel] =
+    React.useState<GridColumnVisibilityModel>({
+      year: true,
+      shirtSize: false,
+      gender: false,
+      birthday: false,
+      createdAt: false,
+      dietAndFoodAllergies: false,
+      medicalConditions: false,
+    })
+
+  const [editing, setEditing] = React.useState(false)
+  const [saving, setSaving] = React.useState(false)
+  const [rowModesModel, setRowModesModel] = React.useState<GridRowModesModel>(
+    {}
+  )
+
+  const processRowUpdate = async (
+    newRow: ParentDashboardRow,
+    oldRow: ParentDashboardRow
+  ): Promise<ParentDashboardRow> => {
+    const registration = familyData.registrations.get(newRow.registrationId)
+    const camper = campers.get(newRow.camperId)
+    const registrationUpdate = []
+    const camperUpdate = []
+
+    setSaving(true)
+    editableColumns.forEach((column) => {
+      /*
+       * Assumes that if a field is not present in the Registration document,
+       * then it must be present in the Camper document
+       */
+      const field = column.field
+      if (newRow[field] !== oldRow[field]) {
+        registration[field]
+          ? registrationUpdate.push([field, newRow[field]])
+          : camperUpdate.push([field, newRow[field]])
+      }
+    })
+    if (registrationUpdate.length > 0) {
+      await updateDoc(registration.ref, Object.fromEntries(registrationUpdate))
+    }
+    if (camperUpdate.length > 0) {
+      await updateDoc(camper.ref, Object.fromEntries(camperUpdate))
+    }
+    setSaving(false)
+    return newRow
+  }
+
+  const handleEditClick = (id: GridRowId) => () => {
+    setEditing(true)
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.Edit } })
+  }
+  const handleCancelClick = (id: GridRowId) => () => {
+    setEditing(false)
+    setRowModesModel({
+      ...rowModesModel,
+      [id]: { mode: GridRowModes.View, ignoreModifications: true },
+    })
+  }
+  const handleConfirmClick = (id: GridRowId) => () => {
+    setEditing(false)
+    setRowModesModel({ ...rowModesModel, [id]: { mode: GridRowModes.View } })
+  }
+
+  const actions: GridColDef = {
+    field: "actions",
+    headerName: "Actions",
+    type: "actions",
+    width: 85,
+    getActions: ({ id }) =>
+      rowModesModel[id]?.mode === GridRowModes.Edit
+        ? [
+            <Tooltip title="Save" disableInteractive>
+              <GridActionsCellItem
+                icon={<SaveIcon />}
+                label="Save"
+                onClick={handleConfirmClick(id)}
+              />
+            </Tooltip>,
+            <Tooltip title="Restore" disableInteractive>
+              <GridActionsCellItem
+                icon={<RestoreIcon />}
+                label="Restore"
+                onClick={handleCancelClick(id)}
+              />
+            </Tooltip>,
+          ]
+        : [
+            <Tooltip title="Edit" disableInteractive>
+              <GridActionsCellItem
+                icon={<EditIcon />}
+                label="Edit"
+                onClick={handleEditClick(id)}
+              />
+            </Tooltip>,
+          ],
+  }
+
+  // Query
+
+  // For every user we have an email that we'll use to see what family they're part of.
+  // Then, we can see all of the parents and campers registered.
+  // From the campers, we can then see all past registered camps.
+
+  // This page will consist of a grid of parent profiles and a grid of camper profiles.
+  // Then it will show a table of all previous registrations along with status.
+  // TODO: Add a cancel option for parents
+  // Need to start tracking transaction information too maybe?
+
+  return (
+    <SnackbarAlertProvider>
+      <PrivateRoute>
+        <Section sx={{ height: "85vh", width: "xl" }}>
+          <Typography variant="h3" textAlign="center">
+            Registration Dashboard
+          </Typography>
+          <Typography variant="h5" sx={{ padding: "4% 0 1% 0" }}>
+            {currentYear} Current Registrations
+          </Typography>
+          <Box
+            sx={{
+              "& .editable--header": {
+                backgroundColor: editing
+                  ? theme.palette.primary.light
+                  : "#FFFFFF",
+              },
+            }}
+          >
+            <DataGrid
+              rows={curRows}
+              columns={columns
+                .concat(actions)
+                .concat(editableColumns.map((c) => ({ ...c, editable: true })))}
+              loading={loading || saving}
+              editMode="row"
+              rowModesModel={rowModesModel}
+              onRowModesModelChange={(m) => setRowModesModel(m)}
+              onRowEditStop={(p, e) => {
+                /*
+                 * Prevents reverting from Edit -> View mode
+                 * when focus leaves the row (e.g. clicking away)
+                 */
+                if (p.reason === GridRowEditStopReasons.rowFocusOut) {
+                  e.defaultMuiPrevented = true
+                }
+              }}
+              disableRowSelectionOnClick
+              processRowUpdate={processRowUpdate}
+              initialState={{
+                pagination: {
+                  paginationModel: {
+                    pageSize: 20,
+                  },
+                },
+              }}
+              slots={{ toolbar: GridToolbar }}
+              columnVisibilityModel={columnVisibilityModel}
+              onColumnVisibilityModelChange={(m) => setColumnVisibilityModel(m)}
+              sx={{
+                padding: 1,
+                borderRadius: "25px",
+                boxShadow: "6px 6px 0px #FFC3DA",
+              }}
+            />
+          </Box>
+
+          <Typography variant="h5" sx={{ padding: "4% 0 1% 0" }}>
+            Previous Registrations
+          </Typography>
+          <Box>
+            <DataGrid
+              rows={prevRows}
+              columns={columns.concat(editableColumns)}
+              loading={loading || saving}
+              initialState={{
+                pagination: {
+                  paginationModel: {
+                    pageSize: 20,
+                  },
+                },
+              }}
+              disableRowSelectionOnClick
+              slots={{ toolbar: GridToolbar }}
+              columnVisibilityModel={prevColumnVisibilityModel}
+              onColumnVisibilityModelChange={(m) =>
+                setPrevColumnVisibilityModel(m)
+              }
+              sx={{
+                padding: 1,
+                borderRadius: "25px",
+                boxShadow: "6px 6px 0px #FFE6A7",
+              }}
+            />
+          </Box>
+        </Section>
+
+        <OffWaitlistDialog
+          shouldShowDialog={shouldShowOffWaitlistDialog}
+          camperNames={pendingPaymentRows.map((row) => row.firstName)}
+        />
+      </PrivateRoute>
+    </SnackbarAlertProvider>
+  )
+}
+
+export default ProfilePage
+
+export const Head = getPageTitle("Profile")

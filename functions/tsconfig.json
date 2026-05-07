@@ -1,0 +1,24 @@
+{
+  "extends": "../tsconfig.packages.json",
+  "references": [
+    {
+      "path": "../schemas"
+    }
+  ],
+  "compilerOptions": {
+    "module": "CommonJS",
+    "noImplicitReturns": true,
+    "noUnusedLocals": true,
+    "outDir": "lib",
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "target": "ES2020",
+    "rootDir": "src",
+    "baseUrl": "./"
+  },
+  "compileOnSave": true,
+  "include": ["./src/**/*"],
+  "exclude": ["./test", "**/node_modules", "./isolate"]
+}

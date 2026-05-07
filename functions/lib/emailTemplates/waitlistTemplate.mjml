@@ -1,0 +1,113 @@
+<mjml>
+  <mj-head>
+    <mj-title
+      >TACL-LYF Camp {{campYear}} Waitlist Confirmation for
+      {{camperName}}</mj-title
+    >
+    <mj-preview
+      >TACL-LYF Camp {{campYear}} Waitlist Confirmation for
+      {{camperName}}</mj-preview
+    >
+    <mj-attributes>
+      <mj-all
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+      ></mj-all>
+      <mj-text
+        font-weight="400"
+        font-size="16px"
+        color="#000000"
+        line-height="24px"
+        font-family="'Helvetica Neue', Helvetica, Arial, sans-serif"
+      ></mj-text>
+    </mj-attributes>
+  </mj-head>
+  <mj-body>
+    <mj-section>
+      <mj-column>
+        <mj-image
+          src="https://mcusercontent.com/723f6baf2c99017f0ff638067/images/3191263d-980b-642c-7807-5dcd200e2cb1.png"
+        ></mj-image>
+
+        <mj-text font-size="24px" font-family="helvetica" font-weight="bold"
+          >{{camperName}} is on the waitlist for TACL-LYF Camp
+          {{campYear}}!</mj-text
+        >
+
+        <mj-text
+          ><strong>{{camperName}}</strong> is on the waitlist for the
+          <strong>{{campTrack}}</strong> camp track!</mj-text
+        >
+
+        <mj-text>
+          Because we received your registration after we reached our maximum
+          capacity for camp, you have been added to our waitlist. If space
+          becomes available for your camper, we will contact you with further
+          instructions.
+        </mj-text>
+
+        <mj-button
+          background-color="#29A19D"
+          href="https://lyf-registration.tacl.org/user/profile/"
+          >View your waitlist status here!</mj-button
+        >
+
+        <mj-text
+          >Our registration, cancellation, and health policies can be found on
+          our
+          <a href="https://lyf.tacl.org/camp/registration-policy/">website</a>.
+          Please reach out to lyf@tacl.org with any questions!</mj-text
+        >
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-image
+          src="https://mcusercontent.com/723f6baf2c99017f0ff638067/images/49f3e3f1-eea8-4627-f983-ea4afe5774c0.png"
+        ></mj-image>
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-divider
+          padding="0"
+          border-color="lightgrey"
+          border-width="2px"
+        ></mj-divider>
+      </mj-column>
+    </mj-section>
+
+    <mj-section background-color="#404040">
+      <mj-column>
+        <mj-text color="#F2F2F2" align="center"
+          >Taiwanese American Citizens League - Leading Youth Forward | TACL-LYF
+          is a 501(c)(3) nonprofit organization through its parent organization
+          Taiwanese American Citizens League.</mj-text
+        >
+      </mj-column>
+    </mj-section>
+
+    <mj-section>
+      <mj-column>
+        <mj-social align="center">
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-facebook-48.png"
+            href="https://www.facebook.com/tacl.lyf/"
+          ></mj-social-element>
+
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-instagram-48.png"
+            href="https://www.instagram.com/tacllyf/"
+          ></mj-social-element>
+
+          <mj-social-element
+            src="https://cdn-images.mailchimp.com/icons/social-block-v2/color-link-48.png"
+            name="link"
+            href="https://lin.ee/8zWlnfM"
+          ></mj-social-element>
+        </mj-social>
+      </mj-column>
+    </mj-section>
+  </mj-body>
+</mjml>

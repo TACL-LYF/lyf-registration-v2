@@ -1,0 +1,19 @@
+{
+  "extends": "../tsconfig.packages.json",
+  "references": [
+    {
+      "path": "../schemas"
+    }
+  ],
+  "compilerOptions": {
+    "module": "CommonJS",
+    "outDir": "lib",
+    "sourceMap": true,
+    "strict": true,
+    "target": "ESNext",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "compileOnSave": true,
+  "include": ["src"]
+}

@@ -1,0 +1,26 @@
+# Small Group Pairing
+
+Module containing all the code necessary for the small group pairing. First off, we'll need to install all the packages necessary using
+
+```
+yarn install
+```
+
+This module is built using TypeScript, so to build it we need to run
+
+```
+yarn run build
+```
+
+All tests should be added to the tests directory and run with
+
+```
+yarn run test
+```
+
+## Structure
+
+At the top level, we have the Editor class (TODO) which will call the Loader class/implementation to get the list of campers and groups.
+
+We pass those to the Pairings class which will create all the mappings between campers and groups. When we want to run the pairing algorithm, we call
+any function that implements the PairingAlgorithm interface with the Pairings class which should return a deep copy with new Pairings.
