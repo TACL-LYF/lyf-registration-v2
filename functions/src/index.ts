@@ -1,3 +1,5 @@
+import "./instrument";
+
 import {initializeApp} from "firebase-admin/app";
 import {SUPPORTED_REGIONS} from "firebase-functions";
 import {setGlobalOptions} from "firebase-functions/v2/options";

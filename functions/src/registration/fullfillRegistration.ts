@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import Stripe from "stripe";
 import {
   DocumentReference,
@@ -105,6 +106,7 @@ export async function completeRegistration(
           camperHealth
         );
       } catch (e) {
+        Sentry.captureException(e);
         await sendMessageToRegistrationErrorMessages(
           `Failed to send confirmation email to ${email} for ${
             registration?.camperName ?? ref.id
@@ -121,6 +123,7 @@ export async function completeRegistration(
       try {
         await sendMessageToRegistrationForCampChannel(description, isTestData);
       } catch (e) {
+        Sentry.captureException(e);
         logger.error(`Error sending slack message: ${e}`);
       }
     })

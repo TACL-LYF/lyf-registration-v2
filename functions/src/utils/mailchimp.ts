@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import {logger} from "firebase-functions";
 import mailchimp from "@mailchimp/mailchimp_marketing";
 import md5 from "md5";
@@ -184,6 +185,7 @@ export async function addMailchimpUserToMailingList(
       logger.warn(`Failed to add ${email} to mailing list`, response);
     }
   } catch (e) {
+    Sentry.captureException(e);
     logger.error(e);
   }
 }
@@ -219,6 +221,7 @@ export async function addParentsToMailchimpList(
           regType
         );
       } catch (e) {
+        Sentry.captureException(e);
         logger.error(
           `Failed to add user ${lowerCaseEmail} with first name: ${firstName}, last name: ${lastName} to mailing list.`,
           e
@@ -236,7 +239,8 @@ export async function addParentsToMailchimpList(
       ];
       try {
         await addMailchimpTags(lowerCaseEmail, tags, regType);
-      } catch {
+      } catch (e) {
+        Sentry.captureException(e);
         sendMessageToRegistrationErrorMessages(
           `Failed to add tags to user ${lowerCaseEmail}: ${tags.join(", ")}`
         );

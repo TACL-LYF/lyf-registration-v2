@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
 import {onRequest, Request} from "firebase-functions/v2/https";
@@ -40,6 +41,7 @@ function handleStripeWebhookHelper(
         isProd ? stripeEndpointSecret : testStripeEndpointSecret
       );
     } catch (err) {
+      Sentry.captureException(err);
       logger.error("Invalid Stripe event", err);
       response.status(400).send();
       return;
@@ -112,6 +114,7 @@ function handleStripeWebhookHelper(
           logger.error("Unhandled event type");
       }
     } catch (error) {
+      Sentry.captureException(error);
       logger.error("Failed to handle the event: ", error);
       sendMessageToRegistrationErrorMessages("Failed to handle an event");
       response.status(500).send();

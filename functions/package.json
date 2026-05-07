@@ -24,6 +24,7 @@
   ],
   "dependencies": {
     "@mailchimp/mailchimp_marketing": "^3.0.80",
+    "@sentry/node": "^10.52.0",
     "@slack/client": "^5.0.2",
     "date-fns": "^3.6.0",
     "date-fns-tz": "^3.2.0",

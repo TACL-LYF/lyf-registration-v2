@@ -1,4 +1,4 @@
-// Firebase
+import * as Sentry from "@sentry/node";
 import {logger} from "firebase-functions";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 
@@ -66,6 +66,7 @@ export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
         message: `created refund (${refundResponse.id}) of ${formattedAmount}`,
       };
     } catch (e) {
+      Sentry.captureException(e);
       logger.error(e);
       sendMessageToRegistrationErrorMessages(
         `Failed to create a Stripe refund for session: ${stripeId}`

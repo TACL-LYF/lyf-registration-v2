@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import {addDays} from "date-fns";
 import {formatInTimeZone} from "date-fns-tz";
 import {logger} from "firebase-functions";
@@ -71,6 +72,7 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
         .doc(`camps/${campYear}/registrations/${registrationId}`)
         .update({status: RegistrationStatus.PENDING_PAYMENT});
     } catch (e) {
+      Sentry.captureException(e);
       logger.error(e);
       sendMessageToRegistrationErrorMessages(
         `Failed to move campers off waitlist: ${camperName}`

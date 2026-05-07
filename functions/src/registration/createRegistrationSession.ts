@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
@@ -266,6 +267,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
       signedInParentEmail,
       isTestData
     ).catch((e) => {
+      Sentry.captureException(e);
       logger.error(e);
       return null;
     });
@@ -299,6 +301,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
         isWaitlist: hasWaitlistedCampers,
       };
     } catch (e) {
+      Sentry.captureException(e);
       logger.error(e);
       sendMessageToRegistrationErrorMessages(
         `Failed to create a Stripe Checkout session: ${signedInParentEmail}`

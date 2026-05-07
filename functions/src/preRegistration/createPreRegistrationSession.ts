@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/node";
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
@@ -143,6 +144,7 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
       );
       return {sessionId: result.id};
     } catch (error) {
+      Sentry.captureException(error);
       logger.error(error);
       return {
         status: "error",
