@@ -33,14 +33,3 @@ export const onCreateWebpackConfig: GatsbyNode["onCreateWebpackConfig"] = ({
   });
 };
 
-export const createPages: GatsbyNode["createPages"] = async ({actions}) => {
-  const { createRedirect } = actions
-  // Use env var directly to avoid evaluation order issues with webpack aliases
-  const authDomain = process.env.GATSBY_FIREBASE_AUTH_DOMAIN
-
-  createRedirect({
-    fromPath: "/__/auth",
-    toPath: authDomain,
-    statusCode: 200,
-  })
-}
