@@ -8,7 +8,8 @@
     "strict": true,
     "target": "ESNext",
     "rootDir": "src",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": []
   },
   "compileOnSave": true,
   "include": ["src"]
