@@ -4,7 +4,7 @@ exports.fulfillPreRegistrations = fulfillPreRegistrations;
 const firestore_1 = require("firebase-admin/firestore");
 const firebase_functions_1 = require("firebase-functions");
 // Local imports
-const enums_1 = require("../legacyZeffyRegistration/enums");
+const lyf_registration_schemas_1 = require("lyf-registration-schemas");
 const slackChannelWebhooks_1 = require("../slack/slackChannelWebhooks");
 const mailchimp_1 = require("../utils/mailchimp");
 const utils_1 = require("../utils");
@@ -78,8 +78,8 @@ async function fulfillPreRegistrations(db, checkoutSession, isTestData) {
         await preRegistrationRef.set({
             // If the payment isn't completed yet, then mark the camper as pending payment.
             status: isPendingPayment
-                ? enums_1.RegistrationStatus.PENDING_PAYMENT
-                : enums_1.RegistrationStatus.PARTIAL_PAYMENT,
+                ? lyf_registration_schemas_1.RegistrationStatus.PENDING_PAYMENT
+                : lyf_registration_schemas_1.RegistrationStatus.PARTIAL_PAYMENT,
             amountPaid: firestore_1.FieldValue.increment(isPendingPayment ? 0 : item.amount_subtotal / 100),
             grade: nextYearGrade,
             isPreRegistered: true,
