@@ -1,7 +1,7 @@
 {
   "name": "lyf-registration",
   "version": "1.0.0",
-  "repository": "git@github.com:TACL-LYF/lyf-registration.git",
+  "repository": "git@github.com:TACL-LYF/lyf-registration-v2.git",
   "author": "TACL LYF <lyf.technology@tacl.org>",
   "license": "MIT",
   "private": true,
