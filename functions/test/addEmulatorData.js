@@ -209,11 +209,11 @@ async function testMigratedData() {
     firstName: "Hock",
     lastName: "Lai",
     email: "hock.lai@gmail.com",
-    city: `${i}_city`,
-    country: `${i}_country`,
-    province: `${i}_province`,
-    street: `${i}_street`,
-    zipcode: `${i}_zipcode`,
+    city: "1_city",
+    country: "1_country",
+    province: "1_province",
+    street: "1_street",
+    zipcode: "1_zipcode",
   });
 }
 

@@ -236,7 +236,7 @@ export async function addParentsToMailchimpList(
       ];
       try {
         await addMailchimpTags(lowerCaseEmail, tags, regType);
-      } catch (e) {
+      } catch {
         sendMessageToRegistrationErrorMessages(
           `Failed to add tags to user ${lowerCaseEmail}: ${tags.join(", ")}`
         );
