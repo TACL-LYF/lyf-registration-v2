@@ -1,5 +1,6 @@
 import {
   collection,
+  DocumentData,
   Firestore,
   FirestoreError,
   query,
@@ -23,7 +24,7 @@ export default function usePayments({
   const canReadPayments = isAdmin && adminRole === "full_admin"
   const [values, loading, error] = useCollection<Payment>(
     canReadPayments
-      ? query<Payment>(
+      ? query<Payment, DocumentData>(
           // @ts-ignore
           collection(firestore, "payments")
         )

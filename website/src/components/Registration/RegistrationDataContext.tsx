@@ -264,7 +264,7 @@ export function registrationReducer(
       const { index, camper } = action as RegistrationPrefillCamperAction
       // Remove the document reference so it doesn't reference itself.
       // Also remove the registrations since Firebase has trouble parsing these.
-      const { ref, registrations, demographics, ...rest } = camper
+      const { ref, registrations, demographics, ...rest } = camper as typeof camper & { demographics?: Record<string, any> }
 
       // Update the camper
       const originalCamper = registrationState.campers[index]
@@ -366,7 +366,7 @@ export function registrationReducer(
           registrations,
           demographics,
           ...camperWithoutFirebaseTypes
-        } = matchingCamper
+        } = matchingCamper as typeof matchingCamper & { demographics?: Record<string, any> }
 
         // Be sure not to accidentally push any firebase types into this object. That messes with the upload later on.
         updatedCampers.push({

@@ -2,6 +2,7 @@ import * as React from "react"
 import {
   collection,
   doc,
+  DocumentData,
   Firestore,
   FirestoreError,
   query,
@@ -99,7 +100,7 @@ export default function useRegistrations({
 
   const [values, loading, error] = useCollection<Registration>(
     isAdmin && adminRole
-      ? query<Registration>(
+      ? query<Registration, DocumentData>(
           // @ts-ignore
           collection(firestore, `camps/${campYear}/registrations`),
           ...constraints
@@ -139,7 +140,7 @@ export default function useRegistrations({
           // Load base camper document (Tier 0 — all admins)
           let camperData = camperDataMap.current.get(data.camper.id)
           if (!camperData) {
-            const camper = await getDoc<Camper>(data.camper)
+            const camper = await getDoc<Camper, DocumentData>(data.camper)
             camperData = camper.exists() ? camper.data() : {}
             if (!camper.exists()) {
               console.error("No camper found.")
@@ -183,14 +184,14 @@ export default function useRegistrations({
           let familyData: FamilyData | undefined =
             familyDataMap.current.get(familyId)
           if (!familyData) {
-            const fam = await getDoc<Family>(family)
+            const fam = await getDoc<Family, DocumentData>(family)
             const emails = fam.data()?.emails
 
             const parentsCollection = collection(
               firestore,
               `/families/${familyId}/parents`
             )
-            const parents = await getDocs<Parent>(query(parentsCollection))
+            const parents = await getDocs<Parent, DocumentData>(query(parentsCollection))
             let parentsData = parents.docs.map((p) => p.data())
 
             if (emails) {

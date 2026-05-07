@@ -61,7 +61,7 @@ export default function SmallGroup({
               const columnSize = nonBinaryListItems.length > 0 ? 4 : 6
               return (
                 listItems.length > 0 && (
-                  <Grid xs={columnSize} item={true} key={genderTitle}>
+                  <Grid size={columnSize} key={genderTitle}>
                     <Typography>
                       <b>{listItems.length}</b> {genderTitle}
                     </Typography>

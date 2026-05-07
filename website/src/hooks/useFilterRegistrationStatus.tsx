@@ -44,7 +44,7 @@ export default function useFilterRegistrationStatus(
       <InputLabel id="demographics-multiple-status-label">
         Filter by Registration Status
       </InputLabel>
-      <Select
+      <Select<string[]>
         labelId="demographics-multiple-status-label"
         id="demographics-multiple-status"
         multiple
