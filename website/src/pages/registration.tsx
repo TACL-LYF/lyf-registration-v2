@@ -16,7 +16,7 @@ import { RegistrationFlow } from "@components/Registration"
 // TODO: Replace this hardcoded list with a list of emails from Firebase or some other dynamic source.
 // We're only including this functionality for people who missed the end of registration and need to
 // bypass the time gating. We need better functionality for allowing specific people to bypass size restrictions.
-const TEMP_ALLOWED_EMAILS = ["jeerhsu@gmail.com", "sloh4137@gmail.com"]
+const TEMP_ALLOWED_EMAILS = []
 
 const RegistrationPage: React.FC<PageProps> = () => {
   return (
