@@ -10,7 +10,7 @@
   },
   "devDependencies": {
     "prettier": "^2.8.1",
-    "typescript": "^4.9.4",
+    "typescript": "~5.8.3",
     "lyf-registration-schemas": "1.0.0"
   },
   "dependencies": {

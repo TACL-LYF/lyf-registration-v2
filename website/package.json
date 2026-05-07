@@ -39,6 +39,7 @@
     "cross-env": "^7.0.3",
     "dayjs": "^1.11.8",
     "dotenv": "^16.0.3",
+    "file-saver": "^2.0.5",
     "firebase": "^10.12.2",
     "gatsby": "^5.0.0",
     "gatsby-omni-font-loader": "^2.0.2",
@@ -48,6 +49,7 @@
     "gatsby-plugin-sharp": "^5.0.0",
     "gatsby-source-filesystem": "^5.0.0",
     "gatsby-transformer-sharp": "^5.0.0",
+    "html-to-image": "^1.11.11",
     "lyf-registration-schemas": "1.0.0",
     "react": "^18.2.0",
     "react-confetti-explosion": "^2.1.2",
@@ -58,15 +60,13 @@
     "react-helmet": "^6.1.0",
     "react-spring-scroll-to-hook": "^1.0.3",
     "small-group-pairing": "1.0.0",
-    "states-us": "^1.0.4",
-    "html-to-image": "^1.11.11",
-    "file-saver": "^2.0.5"
+    "states-us": "^1.0.4"
   },
   "devDependencies": {
     "@types/country-list": "^2.1.4",
     "@types/node": "^20.2.5",
     "@types/react": "^18.0.25",
     "@types/react-dom": "^18.0.8",
-    "typescript": "^5.0.4"
+    "typescript": "~5.8.3"
   }
 }

@@ -97,15 +97,11 @@ export default function useRegistrations({
     familyDataMap.current = new Map()
   }
 
-  const collectionPath = `camps/${campYear}/registrations`
-  // @ts-ignore — access internal for debugging
-  console.log(`[Registrations] Query path: ${collectionPath}, firestore app: ${firestore.app?.options?.projectId}, type: ${firestore.type}`)
-
   const [values, loading, error] = useCollection<Registration>(
     isAdmin && adminRole
       ? query<Registration>(
           // @ts-ignore
-          collection(firestore, collectionPath),
+          collection(firestore, `camps/${campYear}/registrations`),
           ...constraints
         )
       : null
@@ -117,15 +113,11 @@ export default function useRegistrations({
         return
       }
 
-      console.log(`[Registrations] Processing ${values.docs.length} registrations, ${values.docChanges().length} changes`)
-
       await Promise.all(
         values.docChanges().map(async (docChange) => {
           const registration = docChange.doc
           const data = registration.data()
           const id = registration.id
-
-          console.log(`[Registrations] Processing: ${id}`, { camperRef: data.camper?.path, status: data.status })
 
           // Load base camper document (Tier 0 — all admins)
           let camperData = camperDataMap.current.get(data.camper.id)

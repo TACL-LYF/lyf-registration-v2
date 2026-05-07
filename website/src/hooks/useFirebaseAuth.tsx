@@ -20,18 +20,12 @@ export type FirebaseAuthContext = {
 type AdminCheck = { isAdmin: boolean; role: AdminRole | null }
 
 async function checkAdminStatus(email: string | null): Promise<AdminCheck> {
-  if (!email) {
-    console.log("[Auth] No email provided, skipping admin check")
-    return { isAdmin: false, role: null }
-  }
-  console.log(`[Auth] Checking admin status for: "${email}"`)
+  if (!email) return { isAdmin: false, role: null }
   try {
     const adminDoc = await getDoc(doc(firestore, "admins", email))
-    console.log(`[Auth] Admin doc exists: ${adminDoc.exists()}`, adminDoc.data())
     if (!adminDoc.exists()) return { isAdmin: false, role: null }
     return { isAdmin: true, role: adminDoc.data()?.role ?? "full_admin" }
-  } catch (err) {
-    console.error("[Auth] Error checking admin status:", err)
+  } catch {
     return { isAdmin: false, role: null }
   }
 }
