@@ -28,6 +28,11 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
+      - name: Build local workspace packages
+        run: |
+          yarn workspace lyf-registration-schemas build
+          yarn workspace small-group-pairing build
+
       - name: Build website
         run: yarn workspace lyf-registration-website build
         env:
