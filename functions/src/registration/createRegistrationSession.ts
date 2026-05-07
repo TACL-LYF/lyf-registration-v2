@@ -15,7 +15,11 @@ import {
 import {createDiscountName, getStripeCustomerId} from "../registrationUtils";
 import {createRegistrationDonationSession} from "../donation/createDonationSession";
 import {createOrUpdateRegistration} from "./createOrUpdateRegistration";
-import {validateRedirectUrl, resolveTestDataFlag} from "../utils/auth";
+import {
+  validateRedirectUrl,
+  resolveTestDataFlag,
+  validateDollarAmount,
+} from "../utils/auth";
 
 // Import schema
 import {
@@ -56,6 +60,9 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
 
     validateRedirectUrl(successUrl);
     validateRedirectUrl(cancelUrl);
+    if (donation > 0) {
+      validateDollarAmount(donation, "donation", 10000);
+    }
 
     const isTestData = await resolveTestDataFlag(request, requestedTestData);
     const db = getFirestoreDb(!isTestData);

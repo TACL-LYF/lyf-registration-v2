@@ -97,7 +97,7 @@ export default function CheckoutStep({
         donationAmount: donationAmount,
         email: user?.email as string,
         successUrl: `${window.location.origin}${window.location.pathname}?success=1`,
-        cancelUrl: `${window.location.origin}${window.location.pathname}?success=1`,
+        cancelUrl: `${window.location.origin}${window.location.pathname}?success=0`,
         isTestData: isTestData,
       })
 

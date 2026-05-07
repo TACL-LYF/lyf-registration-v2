@@ -46,9 +46,6 @@ const config: GatsbyConfig = {
         icon: "static/lyf-logo-black.png",
       },
     },
-    {
-      resolve: "@sentry/gatsby",
-    },
   ],
 }
 

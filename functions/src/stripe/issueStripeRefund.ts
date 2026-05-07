@@ -1,11 +1,11 @@
 // Firebase
 import {logger} from "firebase-functions";
-import {onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
 
 // Utils
 import {getStripe} from "../utils";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
-import {assertAdmin} from "../utils/auth";
+import {assertAdmin, validateDollarAmount} from "../utils/auth";
 
 type IssueStripeRefundRequest = {
   stripeId: string;
@@ -25,32 +25,41 @@ export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
   async (request) => {
     await assertAdmin(request, ["full_admin"]);
 
+    const {stripeId, amount} = request.data;
+    validateDollarAmount(amount, "amount", 100_000_00);
+
+    if (
+      typeof stripeId !== "string" ||
+      (!stripeId.startsWith("pi_") && !stripeId.startsWith("cs_"))
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        "stripeId must start with 'pi_' or 'cs_'"
+      );
+    }
+
     try {
       const stripe = getStripe(!request.data.isTestData);
       let paymentIntent = null;
-      if (request.data.stripeId.includes("pi_")) {
-        paymentIntent = request.data.stripeId;
-      } else if (request.data.stripeId.includes("cs_")) {
+      if (stripeId.startsWith("pi_")) {
+        paymentIntent = stripeId;
+      } else {
         const checkoutSession = await stripe.checkout.sessions.retrieve(
-          request.data.stripeId
+          stripeId
         );
         paymentIntent =
           typeof checkoutSession.payment_intent === "string"
             ? checkoutSession.payment_intent
             : checkoutSession.payment_intent!.id;
-      } else {
-        throw new Error(
-          "stripeId is neither payment intent or checkout session!"
-        );
       }
       const refundResponse = await stripe.refunds.create({
-        amount: request.data.amount,
+        amount: amount,
         payment_intent: paymentIntent,
       });
       const formattedAmount = new Intl.NumberFormat("en-US", {
         style: "currency",
         currency: "USD",
-      }).format(request.data.amount / 100.0);
+      }).format(amount / 100.0);
       return {
         status: "success",
         code: 200,
@@ -59,7 +68,7 @@ export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
     } catch (e) {
       logger.error(e);
       sendMessageToRegistrationErrorMessages(
-        `Failed to create a Stripe refund for session: ${request.data.stripeId}`
+        `Failed to create a Stripe refund for session: ${stripeId}`
       );
       return {
         status: "error",

@@ -60,7 +60,10 @@ async function updateAndGetFamily(
     {
       emails: FieldValue.arrayUnion(...emails),
       household: householdCulture,
-      ...familyPayload,
+      city: familyPayload.city,
+      state: familyPayload.state,
+      zip: familyPayload.zip,
+      street: familyPayload.street,
     },
     {
       merge: true,
@@ -89,7 +92,12 @@ async function updateAndGetParents(
       parentRefs.push(parentRef);
       await parentRef.set(
         {
-          ...parent,
+          email: parent.email,
+          firstName: parent.firstName,
+          lastName: parent.lastName,
+          phoneNumber: parent.phoneNumber,
+          lineId: parent.lineId,
+          subscribeToMailingList: parent.subscribeToMailingList,
         },
         {
           merge: true,

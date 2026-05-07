@@ -9,7 +9,11 @@ import {
 } from "../stripe/createStripeCheckoutSession";
 import {getStripeCustomerId} from "../registrationUtils";
 import {getFirestoreDb, StripeWebhookEventType} from "../utils";
-import {validateRedirectUrl, resolveTestDataFlag} from "../utils/auth";
+import {
+  validateRedirectUrl,
+  resolveTestDataFlag,
+  validateDollarAmount,
+} from "../utils/auth";
 
 // Import schema
 import {PreRegistrationInputPayload} from "lyf-registration-schemas";
@@ -50,6 +54,9 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
 
     validateRedirectUrl(successUrl);
     validateRedirectUrl(cancelUrl);
+    if (donationAmount > 0) {
+      validateDollarAmount(donationAmount, "donationAmount", 10000);
+    }
 
     const isTestData = await resolveTestDataFlag(request, requestedTestData);
     const db = getFirestoreDb(!isTestData);

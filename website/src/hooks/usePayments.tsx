@@ -6,19 +6,23 @@ import {
 } from "firebase/firestore"
 import { useCollection } from "react-firebase-hooks/firestore"
 
+import { AdminRole } from "lyf-registration-schemas"
 import { Payment } from "@utils/databaseSchema"
 
 type UsePaymentsProps = {
   isAdmin: boolean
+  adminRole: AdminRole | null
   firestore: Firestore
 }
 
 export default function usePayments({
   isAdmin,
+  adminRole,
   firestore,
 }: UsePaymentsProps): [Payment[], boolean, FirestoreError | undefined] {
+  const canReadPayments = isAdmin && adminRole === "full_admin"
   const [values, loading, error] = useCollection<Payment>(
-    isAdmin
+    canReadPayments
       ? query<Payment>(
           // @ts-ignore
           collection(firestore, "payments")

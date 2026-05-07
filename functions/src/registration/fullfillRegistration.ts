@@ -151,7 +151,10 @@ export async function completeRegistration(
       const newRemainingSpots = new Map<CampTrack, number>();
       Object.entries(remainingSpots).forEach(([campTrack, spots]) => {
         const spotsToSubtract = campTrackSpots.get(campTrack as CampTrack) ?? 0;
-        newRemainingSpots.set(campTrack as CampTrack, spots - spotsToSubtract);
+        newRemainingSpots.set(
+          campTrack as CampTrack,
+          Math.max(0, spots - spotsToSubtract)
+        );
       });
 
       t.update(campYearRef, {

@@ -2,6 +2,7 @@ import Stripe from "stripe";
 import {logger} from "firebase-functions";
 import {onRequest, Request} from "firebase-functions/v2/https";
 import {Response} from "express";
+import {FieldValue} from "firebase-admin/firestore";
 
 import {
   stripeEndpointSecret,
@@ -41,6 +42,15 @@ function handleStripeWebhookHelper(
     } catch (err) {
       logger.error("Invalid Stripe event", err);
       response.status(400).send();
+      return;
+    }
+
+    // Idempotency: skip if this event has already been processed
+    const eventRef = db.collection("_processedEvents").doc(event.id);
+    const eventDoc = await eventRef.get();
+    if (eventDoc.exists) {
+      logger.info(`Event ${event.id} already processed, skipping`);
+      response.status(200).json({received: true}).send();
       return;
     }
 
@@ -107,6 +117,12 @@ function handleStripeWebhookHelper(
       response.status(500).send();
       return;
     }
+
+    // Mark event as processed for idempotency
+    await eventRef.set({
+      type: event.type,
+      processedAt: FieldValue.serverTimestamp(),
+    });
 
     response
       .status(200)

@@ -91,6 +91,29 @@ export function assertCallerEmailInList(
 }
 
 /**
+ * Validates that a dollar amount is a positive finite integer.
+ * Used for donation and refund amounts.
+ */
+export function validateDollarAmount(
+  amount: number,
+  fieldName: string,
+  maxCents = 1_000_000
+): void {
+  if (
+    typeof amount !== "number" ||
+    !Number.isFinite(amount) ||
+    !Number.isInteger(amount) ||
+    amount <= 0 ||
+    amount > maxCents
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      `${fieldName} must be a positive integer up to ${maxCents}`
+    );
+  }
+}
+
+/**
  * Resolves whether the caller is allowed to use test data.
  * Only admins may set isTestData=true; non-admins are silently
  * forced to production mode.

@@ -34,5 +34,9 @@ export async function sendMessageToRegistrationErrorMessages(
   message: string,
   isTestData?: boolean
 ) {
+  if (isTestData) {
+    return;
+  }
+
   await registrationErrorMessagesWebhook.send(message);
 }

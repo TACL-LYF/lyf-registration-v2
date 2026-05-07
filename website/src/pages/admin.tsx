@@ -105,28 +105,28 @@ const AdminPage: React.FC = () => {
           marginRight: "auto",
         }}
       >
-        <Tab label="All Registrations" id="tab-all-registrations" />
-        <Tab label="Waitlist and Pending Payments" id="tab-waitlist" />
+        <Tab value={AdminTab.ALL_REGISTRATIONS} label="All Registrations" id="tab-all-registrations" />
+        <Tab value={AdminTab.WAITLIST_PENDING_PAYMENTS} label="Waitlist and Pending Payments" id="tab-waitlist" />
         {adminRole === "full_admin" && (
-          <Tab label="Demographics" id="tab-demographics" />
+          <Tab value={AdminTab.DEMOGRAPHICS} label="Demographics" id="tab-demographics" />
         )}
         {adminRole === "full_admin" && (
-          <Tab label="Payments" id="tab-payments" />
+          <Tab value={AdminTab.PAYMENTS} label="Payments" id="tab-payments" />
         )}
-        <Tab label="Camper Checkout" id="tab-camper-checkout" />
+        <Tab value={AdminTab.CAMPER_CHECKOUT} label="Camper Checkout" id="tab-camper-checkout" />
         {adminRole === "full_admin" && (
-          <Tab label="Camp Credits" id="tab-camp-credits" />
+          <Tab value={AdminTab.CAMP_CREDITS} label="Camp Credits" id="tab-camp-credits" />
         )}
         {adminRole === "full_admin" && (
-          <Tab label="Create Test Data" id="tab-create-test-data" />
+          <Tab value={AdminTab.CREATE_TEST_DATA} label="Create Test Data" id="tab-create-test-data" />
         )}
-        <Tab label="Small Group Assignments" id="tab-small-group-assignments" />
+        <Tab value={AdminTab.SMALL_GROUP_ASSIGNMENTS} label="Small Group Assignments" id="tab-small-group-assignments" />
         {adminRole === "full_admin" && (
-          <Tab label="Admin Management" id="tab-admin-management" />
+          <Tab value={AdminTab.ADMIN_MANAGEMENT} label="Admin Management" id="tab-admin-management" />
         )}
       </Tabs>
       <SnackbarAlertProvider>
-        <TabPanel index={0} value={tab} id="all-registrations">
+        <TabPanel index={AdminTab.ALL_REGISTRATIONS} value={tab} id="all-registrations">
           <RegistrationDashboard
             data={data}
             loading={loading}
@@ -134,7 +134,7 @@ const AdminPage: React.FC = () => {
             adminRole={adminRole}
           />
         </TabPanel>
-        <TabPanel index={1} value={tab} id="waitlist">
+        <TabPanel index={AdminTab.WAITLIST_PENDING_PAYMENTS} value={tab} id="waitlist">
           <Grid container justifyContent="center" spacing={1}>
             <Grid size={12}>
               <Waitlist data={data} loading={loading} campYear={year} />
@@ -145,33 +145,33 @@ const AdminPage: React.FC = () => {
           </Grid>
         </TabPanel>
         {adminRole === "full_admin" && (
-          <TabPanel index={2} value={tab} id="demographics">
+          <TabPanel index={AdminTab.DEMOGRAPHICS} value={tab} id="demographics">
             <Demographics data={data} />
           </TabPanel>
         )}
         {adminRole === "full_admin" && (
-          <TabPanel index={3} value={tab} id="payments">
+          <TabPanel index={AdminTab.PAYMENTS} value={tab} id="payments">
             <PaymentDashboard />
           </TabPanel>
         )}
-        <TabPanel index={4} value={tab} id="camper-checkout">
+        <TabPanel index={AdminTab.CAMPER_CHECKOUT} value={tab} id="camper-checkout">
           <CamperCheckout data={data} loading={loading} />
         </TabPanel>
         {adminRole === "full_admin" && (
-          <TabPanel index={5} value={tab} id="camp-credits">
+          <TabPanel index={AdminTab.CAMP_CREDITS} value={tab} id="camp-credits">
             <CampCreditTab />
           </TabPanel>
         )}
         {adminRole === "full_admin" && (
-          <TabPanel index={6} value={tab} id="create-test-data">
+          <TabPanel index={AdminTab.CREATE_TEST_DATA} value={tab} id="create-test-data">
             <CreateTestData campYear={year} />
           </TabPanel>
         )}
-        <TabPanel index={7} value={tab} id="small-group-assignments">
+        <TabPanel index={AdminTab.SMALL_GROUP_ASSIGNMENTS} value={tab} id="small-group-assignments">
           <SmallGroupAssignmentsV2 registrations={data} campYear={year}/>
         </TabPanel>
         {adminRole === "full_admin" && (
-          <TabPanel index={8} value={tab} id="admin-management">
+          <TabPanel index={AdminTab.ADMIN_MANAGEMENT} value={tab} id="admin-management">
             <AdminManagement />
           </TabPanel>
         )}

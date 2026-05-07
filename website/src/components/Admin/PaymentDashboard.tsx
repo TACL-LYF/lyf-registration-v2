@@ -68,9 +68,9 @@ const columns: GridColDef[] = [
 ]
 
 export default function PaymentDashboard({}: PaymentDashboardProps) {
-  const { isAdmin } = React.useContext(AuthContext)
+  const { isAdmin, adminRole } = React.useContext(AuthContext)
   const { firestore } = React.useContext(ProdContext)
-  const [data, loading, error] = usePayments({ isAdmin, firestore })
+  const [data, loading, error] = usePayments({ isAdmin, adminRole, firestore })
 
   // We want most recent payments first
   const sortedData = data.sort(

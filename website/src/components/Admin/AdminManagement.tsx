@@ -28,8 +28,8 @@ import {
 } from "firebase/firestore"
 import { AdminRole } from "lyf-registration-schemas"
 
-import { firestore } from "@utils/firebaseApp"
 import AuthContext from "@components/Auth/AuthContext"
+import { ProdContext } from "@components/ProdContext"
 import { SnackbarAlertContext } from "@components/SnackbarAlert"
 
 type AdminEntry = {
@@ -47,6 +47,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
 
 export default function AdminManagement() {
   const { user } = React.useContext(AuthContext)
+  const { firestore } = React.useContext(ProdContext)
   const { setSnackbar } = React.useContext(SnackbarAlertContext)
   const [admins, setAdmins] = React.useState<AdminEntry[]>([])
   const [loading, setLoading] = React.useState(true)

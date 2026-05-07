@@ -25,8 +25,10 @@ export default function TimeGated({
   children,
 }: TimeGatedProps) {
   const { isAdmin, user } = React.useContext(AuthContext)
+  const userEmailLower = user?.email?.toLowerCase() ?? ""
   const shouldBypassTimeGate =
-    (allowAdmin && isAdmin) || allowEmails.includes(user?.email)
+    (allowAdmin && isAdmin) ||
+    allowEmails.some((e) => e.toLowerCase() === userEmailLower)
   const [isHidden, setIsHidden] = React.useState(
     forceHide && shouldBypassTimeGate
   )
