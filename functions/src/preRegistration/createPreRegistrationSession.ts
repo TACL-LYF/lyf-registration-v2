@@ -1,5 +1,6 @@
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
+import {onCall} from "firebase-functions/v2/https";
 
 // Local imports
 import {
@@ -7,11 +8,7 @@ import {
   LineItem,
 } from "../stripe/createStripeCheckoutSession";
 import {getStripeCustomerId} from "../registrationUtils";
-import {
-  functionsRegion,
-  getFirestoreDb,
-  StripeWebhookEventType,
-} from "../utils";
+import {getFirestoreDb, StripeWebhookEventType} from "../utils";
 
 // Import schema
 import {PreRegistrationInputPayload} from "lyf-registration-schemas";
@@ -23,10 +20,10 @@ export interface PreRegistrationLineItemMetadata extends Stripe.Metadata {
   currentGradeString: string;
 }
 
-export const createPreRegistrationSession = functionsRegion.https.onCall(
-  (data: PreRegistrationInputPayload, context) => {
-    // If the user isn't signed in, then this isn't a valid request.
-    if (!context.auth) {
+export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
+  {cors: true},
+  async (request) => {
+    if (!request.auth) {
       return {
         status: "error",
         code: 401,
@@ -44,16 +41,13 @@ export const createPreRegistrationSession = functionsRegion.https.onCall(
       successUrl,
       cancelUrl,
       isTestData = false,
-    } = data;
+    } = request.data;
 
     const db = getFirestoreDb(!isTestData);
-    // Need to convert to strings since the value is possibly null.
     const camperCurrentGradesString = camperCurrentGrades?.map((grade) =>
       grade ? grade.toString() : ""
     );
 
-    // Price of a pre-registration is hard-coded at $500 right now but eventually we can get this from the firebase
-    // database for the camp document.
     const stripeLineItems: LineItem<PreRegistrationLineItemMetadata>[] =
       campersToPreRegister.map((name, index) => ({
         priceInDollars: 500,
@@ -70,7 +64,6 @@ export const createPreRegistrationSession = functionsRegion.https.onCall(
         },
       }));
 
-    // If the user included a donation, then add that line item.
     if (donationAmount > 0) {
       stripeLineItems.push({
         priceInDollars: donationAmount,
@@ -78,7 +71,6 @@ export const createPreRegistrationSession = functionsRegion.https.onCall(
       });
     }
 
-    // Create the parent mapping based on the path of one of the campers.
     const parentRef =
       camperRefsToPreRegister.length > 0
         ? db
@@ -94,42 +86,30 @@ export const createPreRegistrationSession = functionsRegion.https.onCall(
             ", "
           )}${donationAmount > 0 ? " + Donation" : ""}`;
 
-    // Try and get an existing customer. If one doesn't exist, then create one.
-    // Then use that customer to create a checkout session.
-    return getStripeCustomerId(parentRef, email, isTestData)
-      .then((stripeCustomerId) =>
-        // Create the stripe checkout session with the new id
-        createStripeCheckoutSession(
-          stripeLineItems,
-          successUrl,
-          cancelUrl,
-          stripeCustomerId,
-          StripeWebhookEventType.PreRegistration,
-          paymentDescription,
-          isTestData,
-          null /* discount */
-        )
-      )
-      .then((result) => {
-        return {
-          sessionId: result.id,
-        };
-      })
-      .catch((error) => {
-        logger.error(error);
-        return {
-          status: "error",
-          code: 402,
-          message: "Failed to create a Stripe Checkout session",
-        };
-      })
-      .catch((error) => {
-        logger.error(error);
-        return {
-          status: "error",
-          code: 402,
-          message: "Failed to create the Stripe Customer",
-        };
-      });
+    try {
+      const stripeCustomerId = await getStripeCustomerId(
+        parentRef,
+        email,
+        isTestData
+      );
+      const result = await createStripeCheckoutSession(
+        stripeLineItems,
+        successUrl,
+        cancelUrl,
+        stripeCustomerId,
+        StripeWebhookEventType.PreRegistration,
+        paymentDescription,
+        isTestData,
+        null /* discount */
+      );
+      return {sessionId: result.id};
+    } catch (error) {
+      logger.error(error);
+      return {
+        status: "error",
+        code: 402,
+        message: "Failed to create a Stripe Checkout session",
+      };
+    }
   }
 );

@@ -1,15 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.emailTransport = exports.REGISTRATION_EMAIL = exports.RegistrationType = exports.StripeWebhookEventType = exports.combineNames = exports.getFirstName = exports.getStripe = exports.testStripeEndpointSecret = exports.stripeEndpointSecret = exports.testStripe = exports.stripe = exports.getFirestoreDb = exports.testDb = exports.db = exports.functionsRegion = void 0;
+exports.emailTransport = exports.REGISTRATION_EMAIL = exports.RegistrationType = exports.StripeWebhookEventType = exports.combineNames = exports.getFirstName = exports.getStripe = exports.testStripeEndpointSecret = exports.stripeEndpointSecret = exports.testStripe = exports.stripe = exports.getFirestoreDb = exports.testDb = exports.db = void 0;
 const tslib_1 = require("tslib");
-const firebase_functions_1 = require("firebase-functions");
 const stripe_1 = tslib_1.__importDefault(require("stripe"));
 const dotenv_1 = require("dotenv");
 const firestore_1 = require("firebase-admin/firestore");
 const nodemailer_1 = require("nodemailer");
 (0, dotenv_1.config)();
-// Firebase Utils
-exports.functionsRegion = (0, firebase_functions_1.region)(firebase_functions_1.SUPPORTED_REGIONS[3]);
 exports.db = (0, firestore_1.getFirestore)();
 exports.testDb = (0, firestore_1.getFirestore)("internal-test");
 const getFirestoreDb = (isProd) => (isProd ? exports.db : exports.testDb);

@@ -1,6 +1,7 @@
 import * as React from "react"
 import {
   collection,
+  doc,
   Firestore,
   FirestoreError,
   query,
@@ -8,14 +9,22 @@ import {
   DocumentReference,
   getDoc,
   getDocs,
-  Timestamp,
 } from "firebase/firestore"
 import { useCollection } from "react-firebase-hooks/firestore"
 
-import { Camper, Family, Parent, Registration } from "lyf-registration-schemas"
+import {
+  AdminRole,
+  Camper,
+  CamperHealth,
+  Demographics,
+  Family,
+  Parent,
+  Registration,
+} from "lyf-registration-schemas"
 
 type useRegistrationsProps = {
   isAdmin: boolean
+  adminRole: AdminRole | null
   campYear: number
   constraints?: QueryConstraint[]
   firestore: Firestore
@@ -29,9 +38,11 @@ type FamilyData = {
 
 export type RegistrationData = Registration &
   Partial<Camper> &
+  Partial<CamperHealth> &
   FamilyData & {
     registrationRef: DocumentReference
     registrationYear: number
+    demographics?: Demographics
   }
 
 const parentIndex = (parent: Parent, emails: string[]) => {
@@ -43,8 +54,17 @@ const parentIndex = (parent: Parent, emails: string[]) => {
   return index >= 0 ? index : Number.MAX_SAFE_INTEGER
 }
 
+function canReadHealth(role: AdminRole | null): boolean {
+  return role === "health_staff" || role === "full_admin"
+}
+
+function canReadDemographics(role: AdminRole | null): boolean {
+  return role === "full_admin"
+}
+
 export default function useRegistrations({
   isAdmin,
+  adminRole,
   campYear,
   constraints = [],
   firestore,
@@ -56,7 +76,6 @@ export default function useRegistrations({
   const [allData, setAllData] = React.useState<RegistrationData[]>([])
   const pastFirestore = React.useRef<Firestore>(firestore)
   const shouldUpdate = pastFirestore.current !== firestore
-  // If the firestore instance changed, we need to update our maps.
   if (shouldUpdate) {
     pastFirestore.current = firestore
   }
@@ -78,11 +97,15 @@ export default function useRegistrations({
     familyDataMap.current = new Map()
   }
 
+  const collectionPath = `camps/${campYear}/registrations`
+  // @ts-ignore — access internal for debugging
+  console.log(`[Registrations] Query path: ${collectionPath}, firestore app: ${firestore.app?.options?.projectId}, type: ${firestore.type}`)
+
   const [values, loading, error] = useCollection<Registration>(
-    isAdmin
+    isAdmin && adminRole
       ? query<Registration>(
           // @ts-ignore
-          collection(firestore, `camps/${campYear}/registrations`),
+          collection(firestore, collectionPath),
           ...constraints
         )
       : null
@@ -94,16 +117,17 @@ export default function useRegistrations({
         return
       }
 
-      // Go through all docs that changed and update the map.
+      console.log(`[Registrations] Processing ${values.docs.length} registrations, ${values.docChanges().length} changes`)
+
       await Promise.all(
         values.docChanges().map(async (docChange) => {
-          // Could eventually use oldIndex and newIndex maybe but for now
-          // we'll just rely on this.
           const registration = docChange.doc
           const data = registration.data()
           const id = registration.id
 
-          // Add the camper document data.
+          console.log(`[Registrations] Processing: ${id}`, { camperRef: data.camper?.path, status: data.status })
+
+          // Load base camper document (Tier 0 — all admins)
           let camperData = camperDataMap.current.get(data.camper.id)
           if (!camperData) {
             const camper = await getDoc<Camper>(data.camper)
@@ -111,12 +135,40 @@ export default function useRegistrations({
             if (!camper.exists()) {
               console.error("No camper found.")
             }
-
             camperDataMap.current.set(data.camper.id, camperData)
           }
 
-          // Go through all of the parents listed in the family and add them to the object.
-          // Assume we can always find the camper for now. We'll have to add proper error handling later.
+          // Load private health sub-doc (Tier 1 — health_staff, full_admin)
+          let healthData: Partial<CamperHealth> = {}
+          if (canReadHealth(adminRole)) {
+            try {
+              const healthDoc = await getDoc(
+                doc(firestore, `${data.camper.path}/private/health`)
+              )
+              if (healthDoc.exists()) {
+                healthData = healthDoc.data() as CamperHealth
+              }
+            } catch {
+              // Permission denied or doc doesn't exist — leave empty
+            }
+          }
+
+          // Load private demographics sub-doc (Tier 2 — full_admin only)
+          let demographicsData: Demographics | undefined
+          if (canReadDemographics(adminRole)) {
+            try {
+              const demoDoc = await getDoc(
+                doc(firestore, `${data.camper.path}/private/demographics`)
+              )
+              if (demoDoc.exists()) {
+                demographicsData = demoDoc.data() as Demographics
+              }
+            } catch {
+              // Permission denied or doc doesn't exist — leave empty
+            }
+          }
+
+          // Load family and parents (Tier 0 — all admins)
           const family = data.camper.parent.parent as DocumentReference<Family>
           const familyId = family.id as string
           let familyData: FamilyData | undefined =
@@ -150,8 +202,10 @@ export default function useRegistrations({
             registrationRef: registration.ref,
             registrationYear: campYear,
             ...camperData,
+            ...healthData,
             ...data,
             ...familyData,
+            ...(demographicsData ? { demographics: demographicsData } : {}),
           })
         })
       )

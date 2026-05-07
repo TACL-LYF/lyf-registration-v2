@@ -83,10 +83,8 @@ export async function completeRegistration(
   // Send confirmation emails to registered campers
   await Promise.all(
     registrationRefs.map(async (ref) => {
-      const {camper, registration} = await getRegistrationAndCamperInfo(
-        db,
-        ref
-      );
+      const {camper, camperHealth, registration} =
+        await getRegistrationAndCamperInfo(db, ref);
 
       if (!camper || !registration) {
         await sendMessageToRegistrationErrorMessages(
@@ -103,7 +101,8 @@ export async function completeRegistration(
           email,
           Number.parseInt(campYear),
           camper,
-          registration
+          registration,
+          camperHealth
         );
       } catch (e) {
         await sendMessageToRegistrationErrorMessages(

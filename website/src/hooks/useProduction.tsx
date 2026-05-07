@@ -17,9 +17,10 @@ export type ProdContextType = {
  * @returns The production context for the app
  */
 export default function useProduction(): ProdContextType {
+  const isUsingEmulators = process.env.GATSBY_USE_EMULATORS === "true"
   const isOnTestDomain =
     typeof window !== "undefined" && window?.location?.hostname === "localhost"
-  const [isProd, setIsProd] = useState(!isOnTestDomain)
+  const [isProd, setIsProd] = useState(isUsingEmulators || !isOnTestDomain)
 
   const firestore = isProd ? prodFirestore : testFirestore
   const getStripe = isProd ? getStripeProd : getStripeTest

@@ -21,7 +21,7 @@ import {
   getParentPhoneNumbers,
 } from "@hooks/useRegistrations"
 import { Table, DataGridColumnAlign } from "@components/Table"
-import { RegistrationStatus } from "lyf-registration-schemas"
+import { AdminRole, RegistrationStatus } from "lyf-registration-schemas"
 
 // Utils
 import { Payment } from "@utils/databaseSchema"
@@ -39,6 +39,7 @@ type RegistrationDashboardProps = {
   data: RegistrationData[]
   loading: boolean
   campYear: number
+  adminRole: AdminRole | null
 }
 
 export interface RegDashboardRow extends RowWithStatusAndNotes {
@@ -59,7 +60,9 @@ export interface RegDashboardRow extends RowWithStatusAndNotes {
   internalNotes: string
 }
 
-const columns: GridColDef[] = [
+const HEALTH_FIELDS = new Set(["medicalConditions", "dietAndFoodAllergies"])
+
+const allColumns: GridColDef[] = [
   {
     field: "name",
     headerName: "Name",
@@ -193,11 +196,19 @@ const columns: GridColDef[] = [
   },
 ]
 
+function getColumnsForRole(role: AdminRole | null): GridColDef[] {
+  const canSeeHealth = role === "health_staff" || role === "full_admin"
+  if (canSeeHealth) return allColumns
+  return allColumns.filter((col) => !HEALTH_FIELDS.has(col.field))
+}
+
 export default function RegistrationDashboard({
   data,
   loading,
   campYear,
+  adminRole,
 }: RegistrationDashboardProps) {
+  const columns = React.useMemo(() => getColumnsForRole(adminRole), [adminRole])
   const [filteredData, selectComponent] = useFilterRegistrationStatus(data, [
     RegistrationStatus.ACTIVE,
   ])

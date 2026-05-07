@@ -1,5 +1,4 @@
 import Stripe from "stripe";
-export declare const functionsRegion: import("firebase-functions").FunctionBuilder;
 export declare const db: FirebaseFirestore.Firestore;
 export declare const testDb: FirebaseFirestore.Firestore;
 export declare const getFirestoreDb: (isProd: boolean) => FirebaseFirestore.Firestore;

@@ -1,7 +1,7 @@
 // This file contains the schema for the payload the
 // client will send to the server.
 
-import { Camper, Demographics, Family, Parent, HouseholdCulture } from "./families"
+import { Camper, CamperHealth, Demographics, Family, Parent, HouseholdCulture } from "./families"
 
 import { Registration } from "./camp"
 
@@ -10,7 +10,7 @@ export type RegistrationData = {
   campYear: number
   family: Family
   parents: Parent[]
-  campers: (Camper & Registration)[]
+  campers: (Camper & CamperHealth & Registration)[]
   demographics: Demographics[]
   donation: number
   household: HouseholdCulture

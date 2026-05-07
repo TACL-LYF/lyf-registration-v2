@@ -50,14 +50,14 @@ async function calculateDiscountAmounts(db, discountAmount, campYearRef, numberO
 async function completeRegistration(db, isTestData, campYear, email, familyRef, registrationRefs, registrationDescriptions, campCreditUsed, campTrackSpots) {
     // Send confirmation emails to registered campers
     await Promise.all(registrationRefs.map(async (ref) => {
-        const { camper, registration } = await (0, getRegistrationAndCamperInfo_1.getRegistrationAndCamperInfo)(db, ref);
+        const { camper, camperHealth, registration } = await (0, getRegistrationAndCamperInfo_1.getRegistrationAndCamperInfo)(db, ref);
         if (!camper || !registration) {
             await (0, slackChannelWebhooks_1.sendMessageToRegistrationErrorMessages)(`Failed to send confirmation email to ${email} for ${registration?.camperName ?? ref.id}`);
             return;
         }
         firebase_functions_1.logger.info(`Sending confirmation email to ${email}`);
         try {
-            await (0, sendRegistrationEmail_1.sendRegistrationEmail)(email, Number.parseInt(campYear), camper, registration);
+            await (0, sendRegistrationEmail_1.sendRegistrationEmail)(email, Number.parseInt(campYear), camper, registration, camperHealth);
         }
         catch (e) {
             await (0, slackChannelWebhooks_1.sendMessageToRegistrationErrorMessages)(`Failed to send confirmation email to ${email} for ${registration?.camperName ?? ref.id}`);

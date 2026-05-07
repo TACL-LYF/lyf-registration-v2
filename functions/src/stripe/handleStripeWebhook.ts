@@ -1,8 +1,9 @@
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
+import {onRequest, Request} from "firebase-functions/v2/https";
+import {Response} from "express";
 
 import {
-  functionsRegion,
   stripeEndpointSecret,
   testStripeEndpointSecret,
   StripeWebhookEventType,
@@ -16,16 +17,15 @@ import {
   sendMessageToRegistrationForCampChannel,
 } from "../slack/slackChannelWebhooks";
 
-type OnRequestType = typeof functionsRegion.https.onRequest;
-type OnRequestHandler = Parameters<OnRequestType>[0];
-
 /**
  * A wrapper around the anonymous function handler used in onRequest. This wrapper
  * provides the database object as needed.
  * @param isProd Whether the request is coming from the production or test webhook
- * @returns The actual onRequest object used by the webhook.
+ * @returns The actual onRequest handler used by the webhook.
  */
-function handleStripeWebhookHelper(isProd: boolean): OnRequestHandler {
+function handleStripeWebhookHelper(
+  isProd: boolean
+): (request: Request, response: Response) => Promise<void> {
   const db = getFirestoreDb(isProd);
   const stripe = getStripe(isProd);
 
@@ -33,14 +33,12 @@ function handleStripeWebhookHelper(isProd: boolean): OnRequestHandler {
     const sig = request.headers["stripe-signature"] as string;
     let event: Stripe.Event;
     try {
-      // Verify the request against our endpointSecret
       event = stripe.webhooks.constructEvent(
         request.rawBody,
         sig,
         isProd ? stripeEndpointSecret : testStripeEndpointSecret
       );
     } catch (err) {
-      // We couldn't parse the event so send down 400 so the server will try again.
       logger.error("Invalid Stripe event", err);
       response.status(400).send();
       return;
@@ -55,8 +53,6 @@ function handleStripeWebhookHelper(isProd: boolean): OnRequestHandler {
           const sessionWithLineItems = await stripe.checkout.sessions.retrieve(
             session.id,
             {
-              // We want to get the metadata on the product item.
-              // https://stripe.com/docs/expand
               expand: [
                 "line_items.data.price.product",
                 "payment_intent.payment_method",
@@ -121,10 +117,12 @@ function handleStripeWebhookHelper(isProd: boolean): OnRequestHandler {
   };
 }
 
-export const handleStripeWebhook = functionsRegion.https.onRequest(
+export const handleStripeWebhook = onRequest(
+  {cors: false},
   handleStripeWebhookHelper(true /* isProd */)
 );
 
-export const handleTestStripeWebhook = functionsRegion.https.onRequest(
+export const handleTestStripeWebhook = onRequest(
+  {cors: false},
   handleStripeWebhookHelper(false /* isProd */)
 );

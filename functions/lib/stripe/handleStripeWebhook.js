@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.handleTestStripeWebhook = exports.handleStripeWebhook = void 0;
 const firebase_functions_1 = require("firebase-functions");
+const https_1 = require("firebase-functions/v2/https");
 const utils_1 = require("../utils");
 const fullfillRegistration_1 = require("../registration/fullfillRegistration");
 const fulfillPreRegistrations_1 = require("../preRegistration/fulfillPreRegistrations");
@@ -10,7 +11,7 @@ const slackChannelWebhooks_1 = require("../slack/slackChannelWebhooks");
  * A wrapper around the anonymous function handler used in onRequest. This wrapper
  * provides the database object as needed.
  * @param isProd Whether the request is coming from the production or test webhook
- * @returns The actual onRequest object used by the webhook.
+ * @returns The actual onRequest handler used by the webhook.
  */
 function handleStripeWebhookHelper(isProd) {
     const db = (0, utils_1.getFirestoreDb)(isProd);
@@ -19,11 +20,9 @@ function handleStripeWebhookHelper(isProd) {
         const sig = request.headers["stripe-signature"];
         let event;
         try {
-            // Verify the request against our endpointSecret
             event = stripe.webhooks.constructEvent(request.rawBody, sig, isProd ? utils_1.stripeEndpointSecret : utils_1.testStripeEndpointSecret);
         }
         catch (err) {
-            // We couldn't parse the event so send down 400 so the server will try again.
             firebase_functions_1.logger.error("Invalid Stripe event", err);
             response.status(400).send();
             return;
@@ -35,8 +34,6 @@ function handleStripeWebhookHelper(isProd) {
                     firebase_functions_1.logger.info("Handling a checkout session");
                     const session = event.data.object;
                     const sessionWithLineItems = await stripe.checkout.sessions.retrieve(session.id, {
-                        // We want to get the metadata on the product item.
-                        // https://stripe.com/docs/expand
                         expand: [
                             "line_items.data.price.product",
                             "payment_intent.payment_method",
@@ -79,6 +76,6 @@ function handleStripeWebhookHelper(isProd) {
             .send();
     };
 }
-exports.handleStripeWebhook = utils_1.functionsRegion.https.onRequest(handleStripeWebhookHelper(true /* isProd */));
-exports.handleTestStripeWebhook = utils_1.functionsRegion.https.onRequest(handleStripeWebhookHelper(false /* isProd */));
+exports.handleStripeWebhook = (0, https_1.onRequest)({ cors: false }, handleStripeWebhookHelper(true /* isProd */));
+exports.handleTestStripeWebhook = (0, https_1.onRequest)({ cors: false }, handleStripeWebhookHelper(false /* isProd */));
 //# sourceMappingURL=handleStripeWebhook.js.map

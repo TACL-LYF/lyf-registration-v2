@@ -43,20 +43,21 @@ export type Camper = Partial<{
   gender: string[]
   pronouns: string | null
 
-  dietAndFoodAllergies: string | null
-  medicalConditions: string | null
-
   registrations: DocumentReference<Registration>[]
-
-  // Going to move demographics onto the camper
-  demographics: Demographics
 
   // Test Data
   isTestData: boolean
 }>
 
-// First added in 2023 as part of the Registration type.
-// Eventually, we may want to move it onto the Camper document.
+// Stored at: families/{familyId}/campers/{camperId}/private/health
+// Access: health_staff, full_admin
+export type CamperHealth = Partial<{
+  dietAndFoodAllergies: string | null
+  medicalConditions: string | null
+}>
+
+// Stored at: families/{familyId}/campers/{camperId}/private/demographics
+// Access: full_admin only
 export type Demographics = Partial<{
   born: string
   ethnicity: string[]

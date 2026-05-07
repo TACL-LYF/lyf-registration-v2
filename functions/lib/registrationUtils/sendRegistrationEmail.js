@@ -18,7 +18,7 @@ const htmlTemplate = (0, mjml_1.default)(mjmlTemplate, {
  * @param camperAndRegInfo
  * @param demographics
  */
-async function sendRegistrationEmail(emailToSendTo, campYear, camperInfo, registrationInfo) {
+async function sendRegistrationEmail(emailToSendTo, campYear, camperInfo, registrationInfo, camperHealth) {
     const camperName = registrationInfo.camperName;
     const htmlBody = Mustache.render(htmlTemplate, {
         campYear: campYear,
@@ -31,8 +31,8 @@ async function sendRegistrationEmail(emailToSendTo, campYear, camperInfo, regist
         camperPronouns: camperInfo.pronouns,
         camperTShirtSize: registrationInfo.shirtSize,
         camperCabinPreference: registrationInfo.cabinPreference,
-        camperDietFood: camperInfo.dietAndFoodAllergies,
-        camperMedical: camperInfo.medicalConditions,
+        camperDietFood: camperHealth?.dietAndFoodAllergies,
+        camperMedical: camperHealth?.medicalConditions,
         camperAdditionalNotes: registrationInfo.additionalNotes,
     });
     await utils_1.emailTransport.sendMail({

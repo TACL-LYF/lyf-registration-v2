@@ -1,12 +1,9 @@
-import {region, SUPPORTED_REGIONS} from "firebase-functions";
 import Stripe from "stripe";
 import {config} from "dotenv";
 import {getFirestore} from "firebase-admin/firestore";
 import {createTransport} from "nodemailer";
 config();
 
-// Firebase Utils
-export const functionsRegion = region(SUPPORTED_REGIONS[3]);
 export const db = getFirestore();
 export const testDb = getFirestore("internal-test");
 

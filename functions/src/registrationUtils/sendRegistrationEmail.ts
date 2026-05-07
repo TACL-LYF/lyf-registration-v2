@@ -3,7 +3,7 @@ import {readFileSync} from "fs";
 import mjml2html from "mjml";
 import {resolve} from "path";
 
-import {Camper, Registration} from "lyf-registration-schemas";
+import {Camper, CamperHealth, Registration} from "lyf-registration-schemas";
 import {REGISTRATION_EMAIL, emailTransport} from "../utils";
 
 const mjmlTemplate = readFileSync(
@@ -26,7 +26,8 @@ export async function sendRegistrationEmail(
   emailToSendTo: string,
   campYear: number,
   camperInfo: Camper,
-  registrationInfo: Registration
+  registrationInfo: Registration,
+  camperHealth: CamperHealth | null
 ) {
   const camperName = registrationInfo.camperName;
   const htmlBody = Mustache.render(htmlTemplate, {
@@ -40,8 +41,8 @@ export async function sendRegistrationEmail(
     camperPronouns: camperInfo.pronouns,
     camperTShirtSize: registrationInfo.shirtSize,
     camperCabinPreference: registrationInfo.cabinPreference,
-    camperDietFood: camperInfo.dietAndFoodAllergies,
-    camperMedical: camperInfo.medicalConditions,
+    camperDietFood: camperHealth?.dietAndFoodAllergies,
+    camperMedical: camperHealth?.medicalConditions,
     camperAdditionalNotes: registrationInfo.additionalNotes,
   });
 

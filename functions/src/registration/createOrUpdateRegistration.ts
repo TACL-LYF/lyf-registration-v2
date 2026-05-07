@@ -5,6 +5,7 @@ import {
 } from "firebase-admin/firestore";
 import {
   Camper,
+  CamperHealth,
   CampRemainingSpots,
   Demographics,
   Family,
@@ -99,11 +100,8 @@ async function updateAndGetParents(
 }
 
 /**
- * Given a camper payload, update the camper and return the reference to it.
- * @param familyRef
- * @param camperAndRegInfo
- * @param demographics
- * @returns
+ * Given a camper payload, update the camper base doc and write health/demographics
+ * to private sub-documents for RBAC-gated access.
  */
 async function updateAndGetCamper(
   familyRef: DocumentReference<Family>,
@@ -112,6 +110,7 @@ async function updateAndGetCamper(
 ): Promise<DocumentReference<Camper>> {
   const camperRef = await findOrCreateCamper(familyRef, camperAndRegInfo);
 
+  // Base camper doc — accessible to all admin roles
   await camperRef.set(
     {
       firstName: camperAndRegInfo.firstName,
@@ -121,18 +120,25 @@ async function updateAndGetCamper(
 
       gender: camperAndRegInfo.gender,
       pronouns: camperAndRegInfo.pronouns ?? null,
-
-      dietAndFoodAllergies: camperAndRegInfo.dietAndFoodAllergies ?? null,
-      medicalConditions: camperAndRegInfo.medicalConditions ?? null,
-
-      // Start including the demographics info as part of the camper itself
-      // rather than the registration like it was in 2023
-      demographics: demographics,
     },
     {
       merge: true,
     }
   );
+
+  // Private health sub-doc — accessible to health_staff and full_admin
+  const healthRef = camperRef.collection("private").doc("health");
+  await healthRef.set(
+    {
+      dietAndFoodAllergies: camperAndRegInfo.dietAndFoodAllergies ?? null,
+      medicalConditions: camperAndRegInfo.medicalConditions ?? null,
+    } as CamperHealth,
+    { merge: true }
+  );
+
+  // Private demographics sub-doc — accessible to full_admin only
+  const demographicsRef = camperRef.collection("private").doc("demographics");
+  await demographicsRef.set(demographics as Demographics, { merge: true });
 
   return camperRef;
 }

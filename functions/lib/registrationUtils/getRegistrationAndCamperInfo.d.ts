@@ -1,5 +1,5 @@
 import { DocumentReference, Firestore } from "firebase-admin/firestore";
-import { Camper, Registration } from "lyf-registration-schemas";
+import { Camper, CamperHealth, Registration } from "lyf-registration-schemas";
 /**
  * Helper that gets the registration and camper info from a registration ref
  * @param db
@@ -8,6 +8,7 @@ import { Camper, Registration } from "lyf-registration-schemas";
  */
 export declare function getRegistrationAndCamperInfo(db: Firestore, registrationRef: DocumentReference<Registration>): Promise<{
     camper: Camper | null;
+    camperHealth: CamperHealth | null;
     registration: Registration | null;
 }>;
 //# sourceMappingURL=getRegistrationAndCamperInfo.d.ts.map

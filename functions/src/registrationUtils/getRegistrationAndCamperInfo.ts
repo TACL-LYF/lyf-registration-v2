@@ -1,5 +1,5 @@
 import {DocumentReference, Firestore} from "firebase-admin/firestore";
-import {Camper, Registration} from "lyf-registration-schemas";
+import {Camper, CamperHealth, Registration} from "lyf-registration-schemas";
 
 /**
  * Helper that gets the registration and camper info from a registration ref
@@ -12,6 +12,7 @@ export async function getRegistrationAndCamperInfo(
   registrationRef: DocumentReference<Registration>
 ): Promise<{
   camper: Camper | null;
+  camperHealth: CamperHealth | null;
   registration: Registration | null;
 }> {
   const registration = await registrationRef.get();
@@ -19,6 +20,7 @@ export async function getRegistrationAndCamperInfo(
   if (!registrationInfo) {
     return {
       camper: null,
+      camperHealth: null,
       registration: null,
     };
   }
@@ -27,6 +29,7 @@ export async function getRegistrationAndCamperInfo(
   if (!camperRef) {
     return {
       camper: null,
+      camperHealth: null,
       registration: registrationInfo,
     };
   }
@@ -34,8 +37,14 @@ export async function getRegistrationAndCamperInfo(
   const camper = await db.doc(camperRef.path).get();
   const camperInfo = camper?.data();
 
+  const healthDoc = await db
+    .doc(`${camperRef.path}/private/health`)
+    .get();
+  const healthInfo = healthDoc?.data() as CamperHealth | undefined;
+
   return {
     camper: camperInfo ?? null,
+    camperHealth: healthInfo ?? null,
     registration: registrationInfo,
   };
 }

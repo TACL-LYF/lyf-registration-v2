@@ -1,0 +1,89 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function getRole() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role;
+    }
+
+    function isAnyAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    function hasRole(role) {
+      return isAnyAdmin() && getRole() == role;
+    }
+
+    function hasAnyRole(roles) {
+      return isAnyAdmin() && getRole() in roles;
+    }
+
+    // Admin roster — split into separate allow statements to avoid circular evaluation
+    match /admins/{email} {
+      // Any signed-in user can read their own admin doc
+      allow read: if isSignedIn() && request.auth.token.email == email;
+      // Full admins can read any admin doc
+      allow read: if isSignedIn() &&
+        get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role == 'full_admin';
+      // Only full admins can write
+      allow write: if isSignedIn() &&
+        get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role == 'full_admin';
+    }
+
+    // Families — any admin can read; family members or full_admin can write
+    match /families/{familyId} {
+      allow read: if isAnyAdmin() ||
+        (isSignedIn() && request.auth.token.email in resource.data.emails);
+      allow write: if hasRole('full_admin') ||
+        (isSignedIn() && request.auth.token.email in resource.data.emails);
+
+      match /parents/{parentId} {
+        allow read: if isAnyAdmin() || isSignedIn();
+        allow write: if hasRole('full_admin');
+      }
+
+      match /campers/{camperId} {
+        allow read: if isAnyAdmin() || isSignedIn();
+        allow write: if hasRole('full_admin') ||
+          (isSignedIn() && request.auth.token.email in
+            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
+
+        // Private sub-documents — role-gated
+        match /private/health {
+          allow read: if hasAnyRole(['health_staff', 'full_admin']);
+          allow write: if hasRole('full_admin');
+        }
+        match /private/demographics {
+          allow read, write: if hasRole('full_admin');
+        }
+      }
+    }
+
+    // Camp registrations — all admins read/write
+    match /camps/{campYear} {
+      match /{allPaths=**} {
+        allow read: if isAnyAdmin() || isSignedIn();
+        allow write: if isAnyAdmin();
+      }
+    }
+
+    // Payments — full_admin only
+    match /payments/{paymentId} {
+      allow read, write: if hasRole('full_admin');
+    }
+
+    // Credits — full_admin only
+    match /credits/{familyId} {
+      allow read, write: if hasRole('full_admin');
+    }
+
+    // Catch-all: full_admin fallback for any other paths
+    match /{document=**} {
+      allow read, write: if hasRole('full_admin');
+    }
+  }
+}

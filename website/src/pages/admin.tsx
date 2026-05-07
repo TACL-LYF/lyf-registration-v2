@@ -30,6 +30,7 @@ import TabPanel from "@components/TabPanel"
 import { SnackbarAlertProvider } from "@components/SnackbarAlert"
 import PaymentDashboard from "@components/Admin/PaymentDashboard"
 import CampCreditTab from "@components/Admin/CampCreditTab"
+import AdminManagement from "@components/Admin/AdminManagement"
 
 const enum AdminTab {
   ALL_REGISTRATIONS,
@@ -40,14 +41,16 @@ const enum AdminTab {
   CAMP_CREDITS,
   CREATE_TEST_DATA,
   SMALL_GROUP_ASSIGNMENTS,
+  ADMIN_MANAGEMENT,
 }
 
 const AdminPage: React.FC = () => {
-  const { isAdmin } = React.useContext(AuthContext)
+  const { isAdmin, adminRole } = React.useContext(AuthContext)
   const { firestore } = React.useContext(ProdContext)
   const [year, setYear] = React.useState<number>(dayjs().year())
   const [data, loading, error] = useRegistrations({
     isAdmin,
+    adminRole,
     campYear: year,
     firestore,
   })
@@ -104,12 +107,23 @@ const AdminPage: React.FC = () => {
       >
         <Tab label="All Registrations" id="tab-all-registrations" />
         <Tab label="Waitlist and Pending Payments" id="tab-waitlist" />
-        <Tab label="Demographics" id="tab-demographics" />
-        <Tab label="Payments" id="tab-payments" />
+        {adminRole === "full_admin" && (
+          <Tab label="Demographics" id="tab-demographics" />
+        )}
+        {adminRole === "full_admin" && (
+          <Tab label="Payments" id="tab-payments" />
+        )}
         <Tab label="Camper Checkout" id="tab-camper-checkout" />
-        <Tab label="Camp Credits" id="tab-camp-credits" />
-        <Tab label="Create Test Data" id="tab-create-test-data" />
+        {adminRole === "full_admin" && (
+          <Tab label="Camp Credits" id="tab-camp-credits" />
+        )}
+        {adminRole === "full_admin" && (
+          <Tab label="Create Test Data" id="tab-create-test-data" />
+        )}
         <Tab label="Small Group Assignments" id="tab-small-group-assignments" />
+        {adminRole === "full_admin" && (
+          <Tab label="Admin Management" id="tab-admin-management" />
+        )}
       </Tabs>
       <SnackbarAlertProvider>
         <TabPanel index={0} value={tab} id="all-registrations">
@@ -117,6 +131,7 @@ const AdminPage: React.FC = () => {
             data={data}
             loading={loading}
             campYear={year}
+            adminRole={adminRole}
           />
         </TabPanel>
         <TabPanel index={1} value={tab} id="waitlist">
@@ -129,25 +144,37 @@ const AdminPage: React.FC = () => {
             </Grid>
           </Grid>
         </TabPanel>
-        <TabPanel index={2} value={tab} id="demographics">
-          <Demographics data={data} />
-        </TabPanel>
-        <TabPanel index={3} value={tab} id="payments">
-          <PaymentDashboard />
-        </TabPanel>
+        {adminRole === "full_admin" && (
+          <TabPanel index={2} value={tab} id="demographics">
+            <Demographics data={data} />
+          </TabPanel>
+        )}
+        {adminRole === "full_admin" && (
+          <TabPanel index={3} value={tab} id="payments">
+            <PaymentDashboard />
+          </TabPanel>
+        )}
         <TabPanel index={4} value={tab} id="camper-checkout">
           <CamperCheckout data={data} loading={loading} />
         </TabPanel>
-        <TabPanel index={5} value={tab} id="camp-credits">
-          <CampCreditTab />
-        </TabPanel>
-        <TabPanel index={6} value={tab} id="create-test-data">
-          <CreateTestData campYear={year} />
-        </TabPanel>
+        {adminRole === "full_admin" && (
+          <TabPanel index={5} value={tab} id="camp-credits">
+            <CampCreditTab />
+          </TabPanel>
+        )}
+        {adminRole === "full_admin" && (
+          <TabPanel index={6} value={tab} id="create-test-data">
+            <CreateTestData campYear={year} />
+          </TabPanel>
+        )}
         <TabPanel index={7} value={tab} id="small-group-assignments">
-          {/* <SmallGroupAssignments registrations={data} /> */}
           <SmallGroupAssignmentsV2 registrations={data} campYear={year}/>
         </TabPanel>
+        {adminRole === "full_admin" && (
+          <TabPanel index={8} value={tab} id="admin-management">
+            <AdminManagement />
+          </TabPanel>
+        )}
       </SnackbarAlertProvider>
     </Container>
   )

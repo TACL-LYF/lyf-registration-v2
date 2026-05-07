@@ -6,9 +6,6 @@ import {setGlobalOptions} from "firebase-functions/v2/options";
 initializeApp();
 setGlobalOptions({region: SUPPORTED_REGIONS[3]});
 
-// Import our function that grants TACL users admin access
-import processSignUp from "./users/processSignUp";
-
 // Import our function for handling paid Stripe invoices
 import {handleStripeWebhook, handleTestStripeWebhook} from "./stripe/handleStripeWebhook";
 
@@ -25,7 +22,6 @@ import {moveCampersOffWaitlist} from "./registration/moveCampersOffWaitlist";
 import {issueStripeRefund} from "./stripe/issueStripeRefund";
 
 export {
-  processSignUp,
   handleStripeWebhook,
   handleTestStripeWebhook,
   createPreRegistrationSession,

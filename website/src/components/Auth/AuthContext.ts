@@ -6,6 +6,7 @@ const AuthContext = createContext<FirebaseAuthContext>({
   isSignedIn: false,
   user: null,
   isAdmin: false,
+  adminRole: null,
   isAuthLoading: false
 })
 

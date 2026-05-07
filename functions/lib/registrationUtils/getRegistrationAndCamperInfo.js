@@ -13,6 +13,7 @@ async function getRegistrationAndCamperInfo(db, registrationRef) {
     if (!registrationInfo) {
         return {
             camper: null,
+            camperHealth: null,
             registration: null,
         };
     }
@@ -20,13 +21,19 @@ async function getRegistrationAndCamperInfo(db, registrationRef) {
     if (!camperRef) {
         return {
             camper: null,
+            camperHealth: null,
             registration: registrationInfo,
         };
     }
     const camper = await db.doc(camperRef.path).get();
     const camperInfo = camper?.data();
+    const healthDoc = await db
+        .doc(`${camperRef.path}/private/health`)
+        .get();
+    const healthInfo = healthDoc?.data();
     return {
         camper: camperInfo ?? null,
+        camperHealth: healthInfo ?? null,
         registration: registrationInfo,
     };
 }
