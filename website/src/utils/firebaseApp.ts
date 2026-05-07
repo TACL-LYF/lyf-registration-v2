@@ -1,9 +1,10 @@
 import { initializeApp } from "firebase/app"
-import { connectAuthEmulator, getAuth } from "firebase/auth"
-import { connectFirestoreEmulator, getFirestore } from "firebase/firestore"
-import { connectFunctionsEmulator, getFunctions } from "firebase/functions"
+import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth"
+import { connectFirestoreEmulator, getFirestore, type Firestore } from "firebase/firestore"
+import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions"
 
 const USE_EMULATORS = process.env.GATSBY_USE_EMULATORS === "true"
+const isBrowser = typeof window !== "undefined"
 
 export const firebaseConfig = {
   apiKey: process.env.GATSBY_FIREBASE_API_KEY ?? "",
@@ -14,17 +15,17 @@ export const firebaseConfig = {
   appId: process.env.GATSBY_FIREBASE_APP_ID ?? "",
   measurementId: process.env.GATSBY_FIREBASE_MEASUREMENT_ID ?? "",
 }
-const firebaseApp = initializeApp(firebaseConfig)
+const firebaseApp = isBrowser ? initializeApp(firebaseConfig) : null
 
 export default firebaseApp
 
-export const firebaseAuth = getAuth(firebaseApp)
-export const firestore = getFirestore(firebaseApp)
+export const firebaseAuth = isBrowser ? getAuth(firebaseApp!) : (null as unknown as Auth)
+export const firestore = isBrowser ? getFirestore(firebaseApp!) : (null as unknown as Firestore)
 export const prodFirestore = firestore
-export const testFirestore = getFirestore(firebaseApp, "internal-test")
-export const firebaseFunctions = getFunctions(firebaseApp, "us-west2")
+export const testFirestore = isBrowser ? getFirestore(firebaseApp!, "internal-test") : (null as unknown as Firestore)
+export const firebaseFunctions = isBrowser ? getFunctions(firebaseApp!, "us-west2") : (null as unknown as Functions)
 
-if (USE_EMULATORS) {
+if (isBrowser && USE_EMULATORS) {
   connectFirestoreEmulator(firestore, "localhost", 8080)
   connectFirestoreEmulator(testFirestore, "localhost", 8080)
   connectAuthEmulator(firebaseAuth, "http://localhost:9099", { disableWarnings: true })
