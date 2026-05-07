@@ -34,7 +34,7 @@ jobs:
           yarn workspace small-group-pairing build
 
       - name: Build website
-        run: yarn workspace lyf-registration-website build
+        run: yarn workspace lyf-registration-website run build --prefix-paths
         env:
           GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}
           GATSBY_FIREBASE_AUTH_DOMAIN: ${{ secrets.GATSBY_FIREBASE_AUTH_DOMAIN }}
