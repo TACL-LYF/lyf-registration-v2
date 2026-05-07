@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
-import {onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
 
 // Local imports
 import {
@@ -9,6 +9,7 @@ import {
 } from "../stripe/createStripeCheckoutSession";
 import {getStripeCustomerId} from "../registrationUtils";
 import {getFirestoreDb, StripeWebhookEventType} from "../utils";
+import {validateRedirectUrl, resolveTestDataFlag} from "../utils/auth";
 
 // Import schema
 import {PreRegistrationInputPayload} from "lyf-registration-schemas";
@@ -24,11 +25,7 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
   {cors: true},
   async (request) => {
     if (!request.auth) {
-      return {
-        status: "error",
-        code: 401,
-        message: "Not signed in",
-      };
+      throw new HttpsError("unauthenticated", "Not signed in");
     }
 
     const {
@@ -40,10 +37,45 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
       email,
       successUrl,
       cancelUrl,
-      isTestData = false,
+      isTestData: requestedTestData = false,
     } = request.data;
 
+    const authEmail = request.auth.token.email;
+    if (!authEmail || authEmail.toLowerCase() !== email.toLowerCase()) {
+      throw new HttpsError(
+        "permission-denied",
+        "The provided email does not match your authenticated account"
+      );
+    }
+
+    validateRedirectUrl(successUrl);
+    validateRedirectUrl(cancelUrl);
+
+    const isTestData = await resolveTestDataFlag(request, requestedTestData);
     const db = getFirestoreDb(!isTestData);
+
+    // H1: Verify caller owns every camper ref before embedding in Stripe metadata
+    for (const camperRefString of camperRefsToPreRegister) {
+      const camperDoc = db.doc(camperRefString);
+      const familyRef = camperDoc.parent.parent;
+      if (!familyRef) {
+        throw new HttpsError(
+          "invalid-argument",
+          "Invalid camper reference path"
+        );
+      }
+      const familyDoc = await familyRef.get();
+      const familyEmails: string[] = (familyDoc.data()?.emails ?? []).map(
+        (e: string) => e.toLowerCase()
+      );
+      if (!familyEmails.includes(authEmail.toLowerCase())) {
+        throw new HttpsError(
+          "permission-denied",
+          "You do not have permission to pre-register this camper"
+        );
+      }
+    }
+
     const camperCurrentGradesString = camperCurrentGrades?.map((grade) =>
       grade ? grade.toString() : ""
     );

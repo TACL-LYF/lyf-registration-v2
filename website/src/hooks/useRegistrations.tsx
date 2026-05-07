@@ -107,6 +107,23 @@ export default function useRegistrations({
       : null
   )
 
+  // Clear caches when role, campYear, or firestore instance changes
+  const prevAdminRole = React.useRef(adminRole)
+  const prevCampYear = React.useRef(campYear)
+  React.useEffect(() => {
+    if (
+      prevAdminRole.current !== adminRole ||
+      prevCampYear.current !== campYear
+    ) {
+      regDataMap.current = new Map()
+      camperDataMap.current = new Map()
+      familyDataMap.current = new Map()
+      setAllData([])
+      prevAdminRole.current = adminRole
+      prevCampYear.current = campYear
+    }
+  }, [adminRole, campYear])
+
   React.useEffect(() => {
     async function combineData() {
       if (!values) {
@@ -208,7 +225,7 @@ export default function useRegistrations({
       )
     }
     combineData()
-  }, [values])
+  }, [values, adminRole, campYear, firestore])
 
   return [allData, loading, error]
 }

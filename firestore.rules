@@ -42,12 +42,16 @@ service cloud.firestore {
         (isSignedIn() && request.auth.token.email in resource.data.emails);
 
       match /parents/{parentId} {
-        allow read: if isAnyAdmin() || isSignedIn();
+        allow read: if isAnyAdmin() ||
+          (isSignedIn() && request.auth.token.email in
+            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
         allow write: if hasRole('full_admin');
       }
 
       match /campers/{camperId} {
-        allow read: if isAnyAdmin() || isSignedIn();
+        allow read: if isAnyAdmin() ||
+          (isSignedIn() && request.auth.token.email in
+            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
         allow write: if hasRole('full_admin') ||
           (isSignedIn() && request.auth.token.email in
             get(/databases/$(database)/documents/families/$(familyId)).data.emails);
@@ -63,10 +67,15 @@ service cloud.firestore {
       }
     }
 
-    // Camp registrations — all admins read/write
+    // Camp year document — any signed-in user can read camp info (pricing, spots)
     match /camps/{campYear} {
-      match /{allPaths=**} {
-        allow read: if isAnyAdmin() || isSignedIn();
+      allow read: if isSignedIn();
+      allow write: if hasRole('full_admin');
+
+      // Registrations — admins can read/write all; family members can read their own
+      match /registrations/{registrationId} {
+        allow read: if isAnyAdmin() ||
+          (isSignedIn() && request.auth.token.email in resource.data.familyEmails);
         allow write: if isAnyAdmin();
       }
     }

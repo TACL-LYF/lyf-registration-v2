@@ -332,36 +332,38 @@ export default function RegistrationDashboard({
         <GridToolbarDensitySelector />
         <GridToolbarExport />
         <Box sx={{ flexGrow: 1 }} />
-        <Button
-          onClick={async () => {
-            const paymentMap: [RegistrationData, Payment[]][] =
-              await Promise.all(
-                rowSelection.map(async (rowId) => {
-                  const registration = registrationData[rows[rowId].index - 1]
-                  const payments = await Promise.all(
-                    !registration.payments
-                      ? []
-                      : registration.payments.map(async (p) => ({
-                          ...(await getDoc(p)).data(),
-                          ref: p,
-                          id: p.id,
-                        }))
-                  )
-                  return [registration, payments]
-                })
-              )
-            setRefundPayments(new Map(paymentMap))
-            setRefundDialogOpen(true)
-          }}
-          onMouseDown={(e: React.MouseEvent) => {
-            // Prevents moving focus away from other elements
-            e.preventDefault()
-          }}
-          disabled={rowSelection.length === 0}
-          variant="outlined"
-        >
-          Refund
-        </Button>
+        {adminRole === "full_admin" && (
+          <Button
+            onClick={async () => {
+              const paymentMap: [RegistrationData, Payment[]][] =
+                await Promise.all(
+                  rowSelection.map(async (rowId) => {
+                    const registration = registrationData[rows[rowId].index - 1]
+                    const payments = await Promise.all(
+                      !registration.payments
+                        ? []
+                        : registration.payments.map(async (p) => ({
+                            ...(await getDoc(p)).data(),
+                            ref: p,
+                            id: p.id,
+                          }))
+                    )
+                    return [registration, payments]
+                  })
+                )
+              setRefundPayments(new Map(paymentMap))
+              setRefundDialogOpen(true)
+            }}
+            onMouseDown={(e: React.MouseEvent) => {
+              // Prevents moving focus away from other elements
+              e.preventDefault()
+            }}
+            disabled={rowSelection.length === 0}
+            variant="outlined"
+          >
+            Refund
+          </Button>
+        )}
       </GridToolbarContainer>
     )
   }

@@ -1,6 +1,6 @@
 import Stripe from "stripe";
 import {logger} from "firebase-functions";
-import {onCall} from "firebase-functions/v2/https";
+import {HttpsError, onCall} from "firebase-functions/v2/https";
 
 // Local imports
 import {
@@ -15,6 +15,7 @@ import {
 import {createDiscountName, getStripeCustomerId} from "../registrationUtils";
 import {createRegistrationDonationSession} from "../donation/createDonationSession";
 import {createOrUpdateRegistration} from "./createOrUpdateRegistration";
+import {validateRedirectUrl, resolveTestDataFlag} from "../utils/auth";
 
 // Import schema
 import {
@@ -38,13 +39,8 @@ export interface RegistrationLineItemMetadata extends Stripe.Metadata {
 export const createRegistrationSession = onCall<RegistrationPayload>(
   {cors: true},
   async (request) => {
-    // If the user isn't signed in, then this isn't a valid request.
     if (!request.auth) {
-      return {
-        status: "error",
-        code: 401,
-        message: "Not signed in",
-      };
+      throw new HttpsError("unauthenticated", "Not signed in");
     }
 
     const {
@@ -54,10 +50,14 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
       donation,
       successUrl,
       cancelUrl,
-      isTestData = false,
+      isTestData: requestedTestData = false,
       forceWaitlist = false,
     } = request.data;
 
+    validateRedirectUrl(successUrl);
+    validateRedirectUrl(cancelUrl);
+
+    const isTestData = await resolveTestDataFlag(request, requestedTestData);
     const db = getFirestoreDb(!isTestData);
 
     // Get the registration pricing.

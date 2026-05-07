@@ -4,6 +4,7 @@ import {
   Firestore,
 } from "firebase-admin/firestore";
 import {logger} from "firebase-functions";
+import {HttpsError} from "firebase-functions/v2/https";
 
 // Local imports
 import {
@@ -20,24 +21,32 @@ type RefAndExisting<T> = {
 };
 
 /**
- * Given emails, find the familiy that has at least one match.
- * @param db The firestore database to query from.
- * @param emails
+ * Find the family associated with the authenticated caller's email,
+ * or create a new family document if none exists.
+ *
+ * Uses only the verified auth email for lookup to prevent a user from
+ * merging into another family by supplying a victim's email as a co-parent.
+ *
+ * @param db The Firestore database to query from.
+ * @param authEmail The caller's verified email from Firebase Auth.
  */
 export async function findOrCreateFamily(
   db: Firestore,
-  emails: string[]
+  authEmail: string
 ): Promise<DocumentReference<Family>> {
+  const normalizedAuthEmail = authEmail.toLowerCase();
   const familiesQuery = await db
     .collection("families")
-    .where("emails", "array-contains-any", emails)
+    .where("emails", "array-contains", normalizedAuthEmail)
     .get();
   if (familiesQuery.size > 1) {
-    const err = `More than one family found containing emails: ${emails.join(
-      ", "
-    )}`;
-    logger.error(err);
-    throw err;
+    logger.error(
+      `More than one family found for auth email: ${normalizedAuthEmail}`
+    );
+    throw new HttpsError(
+      "failed-precondition",
+      "Multiple families found for your account. Please contact support."
+    );
   }
 
   return familiesQuery.size == 1

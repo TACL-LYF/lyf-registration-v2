@@ -87,7 +87,7 @@ echo "  ✔ Camper: Lily Chen"
 
 # Registration for Lily
 REG1_ID="reg-lily-2026"
-create_doc "camps/${CAMP_YEAR}/registrations/${REG1_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
+create_doc "camps/${CAMP_YEAR}/registrations/${REG1_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Lily Chen\" },
     \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY1_ID}/campers/${CAMPER1_ID}\" },
@@ -98,6 +98,7 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG1_ID}?updateMask.fieldPaths=ca
     \"isReturning\": { \"booleanValue\": true },
     \"isPreRegistered\": { \"booleanValue\": true },
     \"cabinPreference\": { \"stringValue\": \"With cousin Emily\" },
+    \"familyEmails\": { \"arrayValue\": { \"values\": [{\"stringValue\": \"sarah.chen@email.com\"}, {\"stringValue\": \"mike.chen@email.com\"}] } },
     \"createdAt\": { \"timestampValue\": \"2026-02-15T10:30:00Z\" },
     \"updatedAt\": { \"timestampValue\": \"2026-02-15T10:30:00Z\" }
   }
@@ -135,7 +136,7 @@ create_doc "families/${FAMILY1_ID}/campers/${CAMPER2_ID}/private/demographics?up
 echo "  ✔ Camper: Jason Chen"
 
 REG2_ID="reg-jason-2026"
-create_doc "camps/${CAMP_YEAR}/registrations/${REG2_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
+create_doc "camps/${CAMP_YEAR}/registrations/${REG2_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Jason Chen\" },
     \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY1_ID}/campers/${CAMPER2_ID}\" },
@@ -146,6 +147,7 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG2_ID}?updateMask.fieldPaths=ca
     \"isReturning\": { \"booleanValue\": true },
     \"isPreRegistered\": { \"booleanValue\": false },
     \"cabinPreference\": { \"stringValue\": \"\" },
+    \"familyEmails\": { \"arrayValue\": { \"values\": [{\"stringValue\": \"sarah.chen@email.com\"}, {\"stringValue\": \"mike.chen@email.com\"}] } },
     \"createdAt\": { \"timestampValue\": \"2026-03-01T14:00:00Z\" },
     \"updatedAt\": { \"timestampValue\": \"2026-03-01T14:00:00Z\" }
   }
@@ -205,7 +207,7 @@ create_doc "families/${FAMILY2_ID}/campers/${CAMPER3_ID}/private/demographics?up
 echo "  ✔ Camper: Emily Lin"
 
 REG3_ID="reg-emily-2026"
-create_doc "camps/${CAMP_YEAR}/registrations/${REG3_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=waitlistTime&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=internalNotes" "{
+create_doc "camps/${CAMP_YEAR}/registrations/${REG3_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=waitlistTime&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=internalNotes" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Emily Lin\" },
     \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY2_ID}/campers/${CAMPER3_ID}\" },
@@ -216,6 +218,7 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG3_ID}?updateMask.fieldPaths=ca
     \"isReturning\": { \"booleanValue\": false },
     \"isPreRegistered\": { \"booleanValue\": false },
     \"waitlistTime\": { \"timestampValue\": \"2026-03-10T09:15:00Z\" },
+    \"familyEmails\": { \"arrayValue\": { \"values\": [{\"stringValue\": \"jenny.lin@email.com\"}] } },
     \"createdAt\": { \"timestampValue\": \"2026-03-10T09:15:00Z\" },
     \"updatedAt\": { \"timestampValue\": \"2026-03-10T09:15:00Z\" },
     \"internalNotes\": { \"stringValue\": \"Cousin of Lily Chen - requested same cabin\" }
@@ -277,7 +280,7 @@ create_doc "families/${FAMILY3_ID}/campers/${CAMPER4_ID}/private/demographics?up
 echo "  ✔ Camper: Kevin Wang"
 
 REG4_ID="reg-kevin-2026"
-create_doc "camps/${CAMP_YEAR}/registrations/${REG4_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
+create_doc "camps/${CAMP_YEAR}/registrations/${REG4_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Kevin Wang\" },
     \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY3_ID}/campers/${CAMPER4_ID}\" },
@@ -287,6 +290,7 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG4_ID}?updateMask.fieldPaths=ca
     \"shirtSize\": { \"stringValue\": \"AM\" },
     \"isReturning\": { \"booleanValue\": false },
     \"isPreRegistered\": { \"booleanValue\": true },
+    \"familyEmails\": { \"arrayValue\": { \"values\": [{\"stringValue\": \"david.wang@email.com\"}, {\"stringValue\": \"lisa.wang@email.com\"}] } },
     \"createdAt\": { \"timestampValue\": \"2026-03-20T16:45:00Z\" },
     \"updatedAt\": { \"timestampValue\": \"2026-03-20T16:45:00Z\" }
   }

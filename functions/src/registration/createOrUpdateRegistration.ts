@@ -23,6 +23,7 @@ import {
   findOrCreateParent,
   findOrCreateRegistration,
 } from "../registrationUtils";
+import {assertCallerEmailInList} from "../utils/auth";
 
 type CamperAndStatus = {
   camperName: string;
@@ -51,9 +52,10 @@ async function updateAndGetFamily(
   db: Firestore,
   familyPayload: Family,
   emails: string[],
-  householdCulture: HouseholdCulture
+  householdCulture: HouseholdCulture,
+  authEmail: string
 ): Promise<DocumentReference<Family>> {
-  const familyRef = await findOrCreateFamily(db, emails);
+  const familyRef = await findOrCreateFamily(db, authEmail);
   await familyRef.set(
     {
       emails: FieldValue.arrayUnion(...emails),
@@ -161,12 +163,14 @@ export async function createOrUpdateRegistration(
 
   const campRef = db.collection("camps").doc(campYear.toString());
 
-  // Get the parent's emails to determine if
-  // TODO include the auth email in this too because that's guaranteed to be the same
   const emails = parents.map((p) => p.email as string);
 
+  assertCallerEmailInList(authEmail, emails);
+
   // Update the family, parents, and campers according to the payload.
-  const familyRef = await updateAndGetFamily(db, family, emails, household);
+  const familyRef = await updateAndGetFamily(
+    db, family, emails, household, authEmail
+  );
   const parentRefs = await updateAndGetParents(db, familyRef, parents);
 
   // Update each camper and create an initial registration for them
@@ -234,6 +238,8 @@ export async function createOrUpdateRegistration(
           waiverFullName: camperAndRegInfo?.waiverFullName ?? "",
           waiverSignature: camperAndRegInfo?.waiverSignature ?? "",
           waiverSignDate: camperAndRegInfo?.waiverSignDate ?? "",
+
+          familyEmails: emails.map((e) => e.toLowerCase()),
         },
         {
           merge: true,

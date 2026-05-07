@@ -109,4 +109,7 @@ export type Registration = Partial<{
 
   // Test Data
   isTestData: boolean
+
+  // Denormalized from the parent family for Firestore rule ownership checks
+  familyEmails: string[]
 }>

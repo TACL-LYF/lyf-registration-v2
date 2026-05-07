@@ -46,7 +46,13 @@ export default function SignInMenu() {
           <MenuItem onClick={() => navigate("/user/profile")}>User Profile</MenuItem>
         )}
         {isSignedIn && (
-          <MenuItem onClick={() => signOut(firebaseAuth)}>Sign Out</MenuItem>
+          <MenuItem onClick={() => {
+            window.localStorage.removeItem("registration")
+            window.localStorage.removeItem("emailForSignIn")
+            window.localStorage.removeItem("user_id")
+            window.localStorage.removeItem("campYear")
+            signOut(firebaseAuth)
+          }}>Sign Out</MenuItem>
         )}
       </Menu>
     </>

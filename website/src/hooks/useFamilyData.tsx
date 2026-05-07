@@ -146,9 +146,13 @@ export default function useFamilyData({
     // Get any camp credits this family has
     // TODO Remove camp credit
     const campCreditRef = doc(firestore, `/credits/${family.id}`)
-    getDoc(campCreditRef).then((creditDoc) => {
-      setCampCredit(creditDoc.get("amountRemaining") ?? 0)
-    })
+    getDoc(campCreditRef)
+      .then((creditDoc) => {
+        setCampCredit(creditDoc.get("amountRemaining") ?? 0)
+      })
+      .catch(() => {
+        setCampCredit(0)
+      })
 
     // Create a campers collection listener.
     const campersCollection = collection(

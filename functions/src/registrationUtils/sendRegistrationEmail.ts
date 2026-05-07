@@ -4,7 +4,7 @@ import mjml2html from "mjml";
 import {resolve} from "path";
 
 import {Camper, CamperHealth, Registration} from "lyf-registration-schemas";
-import {REGISTRATION_EMAIL, emailTransport} from "../utils";
+import {REGISTRATION_EMAIL, emailTransport, sanitizeForEmailHeader} from "../utils";
 
 const mjmlTemplate = readFileSync(
   resolve(__dirname, "../emailTemplates/registrationTemplate.mjml"),
@@ -49,7 +49,9 @@ export async function sendRegistrationEmail(
   await emailTransport.sendMail({
     from: `TACL-LYF <${REGISTRATION_EMAIL}>`,
     to: emailToSendTo,
-    subject: `TACL-LYF Camp ${campYear} Registration Confirmation for ${camperName}`,
+    subject: sanitizeForEmailHeader(
+      `TACL-LYF Camp ${campYear} Registration Confirmation for ${camperName}`
+    ),
     html: htmlBody,
   });
 }

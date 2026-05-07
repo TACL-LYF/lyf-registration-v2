@@ -5,6 +5,7 @@ import {onCall} from "firebase-functions/v2/https";
 // Utils
 import {getStripe} from "../utils";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
+import {assertAdmin} from "../utils/auth";
 
 type IssueStripeRefundRequest = {
   stripeId: string;
@@ -22,14 +23,7 @@ type IssueStripeRefundRequest = {
 export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
   {cors: true},
   async (request) => {
-    // If the user isn't signed in, then this isn't a valid request.
-    if (!request.auth) {
-      return {
-        status: "error",
-        code: 401,
-        message: "Not signed in",
-      };
-    }
+    await assertAdmin(request, ["full_admin"]);
 
     try {
       const stripe = getStripe(!request.data.isTestData);

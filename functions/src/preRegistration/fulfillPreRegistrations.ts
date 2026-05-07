@@ -113,6 +113,16 @@ export async function fulfillPreRegistrations(
       const nextYearGrade =
         currentGradeString != "" ? parseInt(currentGradeString) + 1 : null;
 
+      // Look up the family's emails for ownership-scoped Firestore rules
+      const familyRef = camperRef.parent.parent;
+      let familyEmails: string[] = [];
+      if (familyRef) {
+        const familyDoc = await familyRef.get();
+        familyEmails = (familyDoc.data()?.emails ?? []).map(
+          (e: string) => e.toLowerCase()
+        );
+      }
+
       // Create a pre-registration for next year's camp.
       const preRegistrationRef = nextYearsCamp.doc(camperRef.id);
       await preRegistrationRef.set(
@@ -131,6 +141,7 @@ export async function fulfillPreRegistrations(
           camper: camperRef,
           camperName: camperName,
           payments: FieldValue.arrayUnion(paymentRef),
+          familyEmails: familyEmails,
         },
         {
           merge: true,

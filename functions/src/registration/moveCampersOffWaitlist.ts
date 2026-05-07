@@ -12,12 +12,14 @@ import {
   getFirestoreDb,
   getFirstName,
   REGISTRATION_EMAIL,
+  sanitizeForEmailHeader,
 } from "../utils";
 import {
   RegistrationStatus,
   MoveCampersOffWaitlistRequest,
 } from "lyf-registration-schemas";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
+import {assertAdmin} from "../utils/auth";
 import mjml2html from "mjml";
 
 // Ensure that all variables wrapped in {{}} are represented here
@@ -45,14 +47,7 @@ const htmlTemplate = mjml2html(mjmlTemplate, {
 export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
   {cors: true},
   async (request) => {
-    // If the user isn't signed in, then this isn't a valid request.
-    if (!request.auth) {
-      return {
-        status: "error",
-        code: 401,
-        message: "Not signed in",
-      };
-    }
+    await assertAdmin(request, ["full_admin"]);
 
     const {
       parentNames,
@@ -105,7 +100,9 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
     return emailTransport.sendMail({
       from: `TACL-LYF <${REGISTRATION_EMAIL}>`,
       to: parentEmails,
-      subject: `[TACL LYF] Congrats - ${camperName} is off the waitlist! Finish registration now to secure your spot!`,
+      subject: sanitizeForEmailHeader(
+        `[TACL LYF] Congrats - ${camperName} is off the waitlist! Finish registration now to secure your spot!`
+      ),
       html: htmlBody,
     });
   }

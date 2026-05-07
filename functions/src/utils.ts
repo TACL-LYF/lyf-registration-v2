@@ -33,6 +33,10 @@ export const combineNames = (names: string[]) =>
     ? names.join(" and ")
     : `${names.slice(0, -1).join(", ")}, and ${names.at(-1)}`;
 
+/** Strip CR/LF to prevent email header injection via user-supplied values. */
+export const sanitizeForEmailHeader = (value: string) =>
+  value.replace(/[\r\n]/g, " ").trim();
+
 export enum StripeWebhookEventType {
   Registration = 0,
   PreRegistration = 1,
