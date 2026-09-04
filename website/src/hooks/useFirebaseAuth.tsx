@@ -7,7 +7,11 @@ import {
   signInWithEmailLink,
 } from "firebase/auth"
 import { doc, getDoc } from "firebase/firestore"
-import { AdminRole } from "lyf-registration-schemas"
+import {
+  AdminRole,
+  normalizeEmail,
+  resolveAdminRole,
+} from "lyf-registration-schemas"
 
 export type FirebaseAuthContext = {
   isSignedIn: boolean
@@ -22,9 +26,13 @@ type AdminCheck = { isAdmin: boolean; role: AdminRole | null }
 async function checkAdminStatus(email: string | null): Promise<AdminCheck> {
   if (!email) return { isAdmin: false, role: null }
   try {
-    const adminDoc = await getDoc(doc(firestore, "admins", email))
-    if (!adminDoc.exists()) return { isAdmin: false, role: null }
-    return { isAdmin: true, role: adminDoc.data()?.role ?? "full_admin" }
+    const adminDoc = await getDoc(doc(firestore, "admins", normalizeEmail(email)))
+    if (!adminDoc.exists() || adminDoc.data()?.disabled === true) {
+      return { isAdmin: false, role: null }
+    }
+    // Fail closed: a missing or unrecognized role value grants nothing.
+    const role = resolveAdminRole(adminDoc.data()?.role)
+    return { isAdmin: role !== null, role }
   } catch {
     return { isAdmin: false, role: null }
   }

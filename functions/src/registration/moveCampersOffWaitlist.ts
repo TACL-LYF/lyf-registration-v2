@@ -48,7 +48,7 @@ const htmlTemplate = mjml2html(mjmlTemplate, {
 export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
   {cors: true},
   async (request) => {
-    await assertAdmin(request, ["full_admin"]);
+    await assertAdmin(request, "manageWaitlist");
 
     const {
       parentNames,

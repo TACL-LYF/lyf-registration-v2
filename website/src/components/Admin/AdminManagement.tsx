@@ -26,7 +26,12 @@ import {
   updateDoc,
   serverTimestamp,
 } from "firebase/firestore"
-import { AdminRole } from "lyf-registration-schemas"
+import {
+  ADMIN_ROLES,
+  AdminRole,
+  normalizeEmail,
+  resolveAdminRole,
+} from "lyf-registration-schemas"
 
 import AuthContext from "@components/Auth/AuthContext"
 import { ProdContext } from "@components/ProdContext"
@@ -34,7 +39,8 @@ import { SnackbarAlertContext } from "@components/SnackbarAlert"
 
 type AdminEntry = {
   email: string
-  role: AdminRole
+  // null when the stored role value is missing or unrecognized (fails closed)
+  role: AdminRole | null
   addedBy: string
   addedAt?: Date
 }
@@ -61,7 +67,7 @@ export default function AdminManagement() {
       const snapshot = await getDocs(collection(firestore, "admins"))
       const entries: AdminEntry[] = snapshot.docs.map((d) => ({
         email: d.id,
-        role: d.data().role ?? "full_admin",
+        role: resolveAdminRole(d.data().role),
         addedBy: d.data().addedBy ?? "unknown",
         addedAt: d.data().addedAt?.toDate?.() ?? undefined,
       }))
@@ -80,7 +86,7 @@ export default function AdminManagement() {
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
-    const email = newEmail.trim().toLowerCase()
+    const email = normalizeEmail(newEmail)
     if (!email) return
 
     if (admins.some((a) => a.email === email)) {
@@ -170,9 +176,11 @@ export default function AdminManagement() {
               onChange={(e) => setNewRole(e.target.value as AdminRole)}
               disabled={submitting}
             >
-              <MenuItem value="full_admin">Full Admin</MenuItem>
-              <MenuItem value="program_staff">Program Staff</MenuItem>
-              <MenuItem value="health_staff">Health Staff</MenuItem>
+              {ADMIN_ROLES.map((role) => (
+                <MenuItem key={role} value={role}>
+                  {ROLE_LABELS[role]}
+                </MenuItem>
+              ))}
             </Select>
           </FormControl>
           <Button
@@ -216,7 +224,11 @@ export default function AdminManagement() {
                     <span>{admin.email}</span>
                     <Select
                       size="small"
-                      value={admin.role}
+                      value={admin.role ?? ""}
+                      displayEmpty
+                      renderValue={(v) =>
+                        v ? ROLE_LABELS[v as AdminRole] : "⚠ Invalid role"
+                      }
                       onChange={(e) =>
                         handleRoleChange(admin.email, e.target.value as AdminRole)
                       }
@@ -224,9 +236,11 @@ export default function AdminManagement() {
                       variant="standard"
                       sx={{ fontSize: "0.875rem" }}
                     >
-                      <MenuItem value="full_admin">Full Admin</MenuItem>
-                      <MenuItem value="program_staff">Program Staff</MenuItem>
-                      <MenuItem value="health_staff">Health Staff</MenuItem>
+                      {ADMIN_ROLES.map((role) => (
+                        <MenuItem key={role} value={role}>
+                          {ROLE_LABELS[role]}
+                        </MenuItem>
+                      ))}
                     </Select>
                   </Stack>
                 }

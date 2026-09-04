@@ -21,7 +21,11 @@ import {
   getParentPhoneNumbers,
 } from "@hooks/useRegistrations"
 import { Table, DataGridColumnAlign } from "@components/Table"
-import { AdminRole, RegistrationStatus } from "lyf-registration-schemas"
+import {
+  AdminRole,
+  RegistrationStatus,
+  roleHasCapability,
+} from "lyf-registration-schemas"
 
 // Utils
 import { Payment } from "@utils/databaseSchema"
@@ -197,7 +201,7 @@ const allColumns: GridColDef[] = [
 ]
 
 function getColumnsForRole(role: AdminRole | null): GridColDef[] {
-  const canSeeHealth = role === "health_staff" || role === "full_admin"
+  const canSeeHealth = roleHasCapability(role, "readHealth")
   if (canSeeHealth) return allColumns
   return allColumns.filter((col) => !HEALTH_FIELDS.has(col.field))
 }
@@ -332,7 +336,7 @@ export default function RegistrationDashboard({
         <GridToolbarDensitySelector />
         <GridToolbarExport />
         <Box sx={{ flexGrow: 1 }} />
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "managePayments") && (
           <Button
             onClick={async () => {
               const paymentMap: [RegistrationData, Payment[]][] =

@@ -15,6 +15,7 @@ import { useCollection } from "react-firebase-hooks/firestore"
 
 import {
   AdminRole,
+  roleHasCapability,
   Camper,
   CamperHealth,
   Demographics,
@@ -55,13 +56,11 @@ const parentIndex = (parent: Parent, emails: string[]) => {
   return index >= 0 ? index : Number.MAX_SAFE_INTEGER
 }
 
-function canReadHealth(role: AdminRole | null): boolean {
-  return role === "health_staff" || role === "full_admin"
-}
+const canReadHealth = (role: AdminRole | null) =>
+  roleHasCapability(role, "readHealth")
 
-function canReadDemographics(role: AdminRole | null): boolean {
-  return role === "full_admin"
-}
+const canReadDemographics = (role: AdminRole | null) =>
+  roleHasCapability(role, "readDemographics")
 
 export default function useRegistrations({
   isAdmin,

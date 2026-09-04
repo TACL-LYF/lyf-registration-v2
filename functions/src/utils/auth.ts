@@ -1,6 +1,13 @@
 import {getFirestore} from "firebase-admin/firestore";
 import {HttpsError, type CallableRequest} from "firebase-functions/v2/https";
-import {AdminRole} from "lyf-registration-schemas";
+import {
+  AdminRole,
+  Capability,
+  normalizeEmail,
+  resolveAdminRole,
+  roleHasCapability,
+  rolesWithCapability,
+} from "lyf-registration-schemas";
 
 const ALLOWED_REDIRECT_ORIGINS = [
   "https://lyf-registration.tacl.org",
@@ -9,16 +16,13 @@ const ALLOWED_REDIRECT_ORIGINS = [
 ];
 
 /**
- * Verifies that the caller is authenticated and has one of the required admin roles.
- * Looks up the caller's email in the `admins` Firestore collection.
- *
- * @throws HttpsError with "unauthenticated" if not signed in
- * @throws HttpsError with "permission-denied" if not an admin or lacks the required role
+ * Looks up the caller's admin role from the `admins` Firestore collection.
+ * Fails closed: a missing doc, a disabled admin, or an unknown/missing role
+ * value all resolve to null.
  */
-export async function assertAdmin(
-  request: CallableRequest,
-  allowedRoles: AdminRole[] = ["full_admin"]
-): Promise<{email: string; role: AdminRole}> {
+async function getCallerAdminRole(
+  request: CallableRequest
+): Promise<{email: string; role: AdminRole | null}> {
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "Not signed in");
   }
@@ -30,21 +34,42 @@ export async function assertAdmin(
 
   const adminDoc = await getFirestore()
     .collection("admins")
-    .doc(email)
+    .doc(normalizeEmail(email))
     .get();
 
-  if (!adminDoc.exists) {
+  if (!adminDoc.exists || adminDoc.data()?.disabled === true) {
+    return {email, role: null};
+  }
+
+  return {email, role: resolveAdminRole(adminDoc.data()?.role)};
+}
+
+/**
+ * Verifies that the caller is authenticated and has an admin role granting
+ * the given capability (see ROLE_CAPABILITIES in the schemas package).
+ *
+ * @throws HttpsError with "unauthenticated" if not signed in
+ * @throws HttpsError with "permission-denied" if not an admin or the caller's
+ *   role lacks the capability
+ */
+export async function assertAdmin(
+  request: CallableRequest,
+  capability: Capability
+): Promise<{email: string; role: AdminRole}> {
+  const {email, role} = await getCallerAdminRole(request);
+
+  if (!role) {
     throw new HttpsError(
       "permission-denied",
       "You do not have permission to perform this action"
     );
   }
 
-  const role = (adminDoc.data()?.role ?? "full_admin") as AdminRole;
-  if (!allowedRoles.includes(role)) {
+  if (!roleHasCapability(role, capability)) {
     throw new HttpsError(
       "permission-denied",
-      "Your role does not have permission to perform this action"
+      `Your role does not have permission to perform this action ` +
+        `(requires one of: ${rolesWithCapability(capability).join(", ")})`
     );
   }
 
@@ -80,8 +105,8 @@ export function assertCallerEmailInList(
   authEmail: string,
   emails: string[]
 ): void {
-  const normalizedAuth = authEmail.toLowerCase();
-  const normalizedEmails = emails.map((e) => e.toLowerCase());
+  const normalizedAuth = normalizeEmail(authEmail);
+  const normalizedEmails = emails.map(normalizeEmail);
   if (!normalizedEmails.includes(normalizedAuth)) {
     throw new HttpsError(
       "permission-denied",
@@ -115,22 +140,16 @@ export function validateDollarAmount(
 
 /**
  * Resolves whether the caller is allowed to use test data.
- * Only admins may set isTestData=true; non-admins are silently
- * forced to production mode.
+ * Only admins whose role grants the createTestData capability may set
+ * isTestData=true; everyone else is silently forced to production mode.
  */
 export async function resolveTestDataFlag(
   request: CallableRequest,
   requestedIsTestData: boolean
 ): Promise<boolean> {
   if (!requestedIsTestData) return false;
+  if (!request.auth?.token?.email) return false;
 
-  const email = request.auth?.token?.email;
-  if (!email) return false;
-
-  const adminDoc = await getFirestore()
-    .collection("admins")
-    .doc(email)
-    .get();
-
-  return adminDoc.exists;
+  const {role} = await getCallerAdminRole(request);
+  return roleHasCapability(role, "createTestData");
 }

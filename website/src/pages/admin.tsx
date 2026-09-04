@@ -31,6 +31,7 @@ import { SnackbarAlertProvider } from "@components/SnackbarAlert"
 import PaymentDashboard from "@components/Admin/PaymentDashboard"
 import CampCreditTab from "@components/Admin/CampCreditTab"
 import AdminManagement from "@components/Admin/AdminManagement"
+import { roleHasCapability } from "lyf-registration-schemas"
 
 const enum AdminTab {
   ALL_REGISTRATIONS,
@@ -107,21 +108,21 @@ const AdminPage: React.FC = () => {
       >
         <Tab value={AdminTab.ALL_REGISTRATIONS} label="All Registrations" id="tab-all-registrations" />
         <Tab value={AdminTab.WAITLIST_PENDING_PAYMENTS} label="Waitlist and Pending Payments" id="tab-waitlist" />
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "readDemographics") && (
           <Tab value={AdminTab.DEMOGRAPHICS} label="Demographics" id="tab-demographics" />
         )}
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "managePayments") && (
           <Tab value={AdminTab.PAYMENTS} label="Payments" id="tab-payments" />
         )}
         <Tab value={AdminTab.CAMPER_CHECKOUT} label="Camper Checkout" id="tab-camper-checkout" />
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "manageCredits") && (
           <Tab value={AdminTab.CAMP_CREDITS} label="Camp Credits" id="tab-camp-credits" />
         )}
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "createTestData") && (
           <Tab value={AdminTab.CREATE_TEST_DATA} label="Create Test Data" id="tab-create-test-data" />
         )}
         <Tab value={AdminTab.SMALL_GROUP_ASSIGNMENTS} label="Small Group Assignments" id="tab-small-group-assignments" />
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "manageAdmins") && (
           <Tab value={AdminTab.ADMIN_MANAGEMENT} label="Admin Management" id="tab-admin-management" />
         )}
       </Tabs>
@@ -144,12 +145,12 @@ const AdminPage: React.FC = () => {
             </Grid>
           </Grid>
         </TabPanel>
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "readDemographics") && (
           <TabPanel index={AdminTab.DEMOGRAPHICS} value={tab} id="demographics">
             <Demographics data={data} />
           </TabPanel>
         )}
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "managePayments") && (
           <TabPanel index={AdminTab.PAYMENTS} value={tab} id="payments">
             <PaymentDashboard />
           </TabPanel>
@@ -157,12 +158,12 @@ const AdminPage: React.FC = () => {
         <TabPanel index={AdminTab.CAMPER_CHECKOUT} value={tab} id="camper-checkout">
           <CamperCheckout data={data} loading={loading} />
         </TabPanel>
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "manageCredits") && (
           <TabPanel index={AdminTab.CAMP_CREDITS} value={tab} id="camp-credits">
             <CampCreditTab />
           </TabPanel>
         )}
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "createTestData") && (
           <TabPanel index={AdminTab.CREATE_TEST_DATA} value={tab} id="create-test-data">
             <CreateTestData campYear={year} />
           </TabPanel>
@@ -170,7 +171,7 @@ const AdminPage: React.FC = () => {
         <TabPanel index={AdminTab.SMALL_GROUP_ASSIGNMENTS} value={tab} id="small-group-assignments">
           <SmallGroupAssignmentsV2 registrations={data} campYear={year}/>
         </TabPanel>
-        {adminRole === "full_admin" && (
+        {roleHasCapability(adminRole, "manageAdmins") && (
           <TabPanel index={AdminTab.ADMIN_MANAGEMENT} value={tab} id="admin-management">
             <AdminManagement />
           </TabPanel>

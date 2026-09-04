@@ -16,6 +16,9 @@ import {
   RegistrationStatus,
   getCampTrack,
   CampTrack,
+  CURRENT_SCHEMA_VERSION,
+  normalizeEmail,
+  normalizeEmails,
 } from "lyf-registration-schemas";
 import {
   findOrCreateCamper,
@@ -64,6 +67,7 @@ async function updateAndGetFamily(
       state: familyPayload.state,
       zip: familyPayload.zip,
       street: familyPayload.street,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
     },
     {
       merge: true,
@@ -92,7 +96,7 @@ async function updateAndGetParents(
       parentRefs.push(parentRef);
       await parentRef.set(
         {
-          email: parent.email,
+          email: parent.email ? normalizeEmail(parent.email) : parent.email,
           firstName: parent.firstName,
           lastName: parent.lastName,
           phoneNumber: parent.phoneNumber,
@@ -130,6 +134,7 @@ async function updateAndGetCamper(
 
       gender: camperAndRegInfo.gender,
       pronouns: camperAndRegInfo.pronouns ?? null,
+      schemaVersion: CURRENT_SCHEMA_VERSION,
     },
     {
       merge: true,
@@ -171,7 +176,9 @@ export async function createOrUpdateRegistration(
 
   const campRef = db.collection("camps").doc(campYear.toString());
 
-  const emails = parents.map((p) => p.email as string);
+  // Normalize at the boundary: family membership emails are identity keys
+  // compared verbatim against request.auth.token.email in firestore.rules.
+  const emails = normalizeEmails(parents.map((p) => p.email));
 
   assertCallerEmailInList(authEmail, emails);
 
@@ -247,7 +254,8 @@ export async function createOrUpdateRegistration(
           waiverSignature: camperAndRegInfo?.waiverSignature ?? "",
           waiverSignDate: camperAndRegInfo?.waiverSignDate ?? "",
 
-          familyEmails: emails.map((e) => e.toLowerCase()),
+          familyEmails: emails,
+          schemaVersion: CURRENT_SCHEMA_VERSION,
         },
         {
           merge: true,

@@ -103,13 +103,18 @@ export type Registration = Partial<{
   waiverSignature: string
   waiverSignDate: string
 
-  // Added in 2023 as part of a push to understand how camp is changing.
-  // Maybe we'll move this out eventually to another type.
+  // DEPRECATED in schemaVersion 2: demographics now live at
+  // families/{familyId}/campers/{camperId}/private/demographics (full_admin only).
+  // Kept for reading pre-2026 registrations; do not write.
   demographics: Record<string, string | string[]>
 
   // Test Data
   isTestData: boolean
 
-  // Denormalized from the parent family for Firestore rule ownership checks
+  // Denormalized from the parent family for Firestore rule ownership checks.
+  // Always lowercase (see normalizeEmail in utils.ts).
   familyEmails: string[]
+
+  // See CURRENT_SCHEMA_VERSION in utils.ts
+  schemaVersion: number
 }>

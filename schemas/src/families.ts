@@ -1,5 +1,6 @@
 import { DocumentReference } from "firebase/firestore"
 
+import { Capability } from "./admin"
 import { Registration } from "./camp"
 
 // Every type is defined with Partial since there's no strict schema in Firebase.
@@ -21,6 +22,9 @@ export type Family = Partial<{
 
   // Test Data
   isTestData: boolean
+
+  // See CURRENT_SCHEMA_VERSION in utils.ts
+  schemaVersion: number
 }>
 
 export type Parent = Partial<{
@@ -47,17 +51,32 @@ export type Camper = Partial<{
 
   // Test Data
   isTestData: boolean
+
+  // See CURRENT_SCHEMA_VERSION in utils.ts
+  schemaVersion: number
 }>
 
+// Sensitive camper data lives in sub-documents at
+// families/{familyId}/campers/{camperId}/private/{section}.
+// This maps each section to the capability required to read it; adding a new
+// sensitive category means adding a section here (plus its type) and
+// mirroring the gate in firestore.rules — nothing else.
+export const PRIVATE_SECTIONS = {
+  health: "readHealth",
+  demographics: "readDemographics",
+} as const satisfies Record<string, Capability>
+
+export type PrivateSection = keyof typeof PRIVATE_SECTIONS
+
 // Stored at: families/{familyId}/campers/{camperId}/private/health
-// Access: health_staff, full_admin
+// Access: roles with the "readHealth" capability
 export type CamperHealth = Partial<{
   dietAndFoodAllergies: string | null
   medicalConditions: string | null
 }>
 
 // Stored at: families/{familyId}/campers/{camperId}/private/demographics
-// Access: full_admin only
+// Access: roles with the "readDemographics" capability
 export type Demographics = Partial<{
   born: string
   ethnicity: string[]

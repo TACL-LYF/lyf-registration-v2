@@ -23,7 +23,7 @@ type IssueStripeRefundRequest = {
 export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
   {cors: true},
   async (request) => {
-    await assertAdmin(request, ["full_admin"]);
+    await assertAdmin(request, "managePayments");
 
     const {stripeId, amount} = request.data;
     validateDollarAmount(amount, "amount", 100_000_00);

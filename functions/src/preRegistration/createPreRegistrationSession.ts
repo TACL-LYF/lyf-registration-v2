@@ -17,7 +17,10 @@ import {
 } from "../utils/auth";
 
 // Import schema
-import {PreRegistrationInputPayload} from "lyf-registration-schemas";
+import {
+  CampYear,
+  PreRegistrationInputPayload,
+} from "lyf-registration-schemas";
 
 export interface PreRegistrationLineItemMetadata extends Stripe.Metadata {
   campYear: string;
@@ -88,9 +91,18 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
       grade ? grade.toString() : ""
     );
 
+    // Price comes from the camp year document so next year's fee is a data
+    // change, not a deploy. Fall back to the historical $500 if unset.
+    const campDoc = await db
+      .collection("camps")
+      .doc(campYear.toString())
+      .get();
+    const preRegistrationFee =
+      (campDoc.data() as CampYear | undefined)?.preRegistrationFee ?? 500;
+
     const stripeLineItems: LineItem<PreRegistrationLineItemMetadata>[] =
       campersToPreRegister.map((name, index) => ({
-        priceInDollars: 500,
+        priceInDollars: preRegistrationFee,
         name: `TACL LYF Camp ${campYear} Pre-Registration: ${name}`,
         metadata: {
           campYear: campYear.toString(),

@@ -7,6 +7,9 @@
  * 2. Copies demographics from each camper doc
  *    into families/{familyId}/campers/{camperId}/private/demographics
  * 3. Adds role: "full_admin" to all existing admin documents
+ * 4. Normalizes family emails (and registration familyEmails) to lowercase so
+ *    firestore.rules exact-match checks against request.auth.token.email work,
+ *    and re-keys any admins/{email} docs whose ID isn't already lowercase
  *
  * Run with: ./run.sh -n migrateToRbac
  */
@@ -76,6 +79,54 @@ async function migrateAdminRoles() {
   console.log(`Added role: "full_admin" to ${count} existing admin docs`)
 }
 
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+async function normalizeEmailCasing() {
+  // Families: lowercase + dedupe the emails membership array
+  const familiesSnapshot = await db.collection("families").get()
+  let familyCount = 0
+  for (const familyDoc of familiesSnapshot.docs) {
+    const emails: string[] = familyDoc.data().emails ?? []
+    const normalized = [...new Set(emails.map(normalizeEmail))]
+    if (JSON.stringify(emails) !== JSON.stringify(normalized)) {
+      await familyDoc.ref.update({emails: normalized})
+      familyCount++
+    }
+  }
+  console.log(`Normalized emails on ${familyCount} family docs`)
+
+  // Registrations across all camp years: lowercase familyEmails
+  const campsSnapshot = await db.collection("camps").get()
+  let regCount = 0
+  for (const campDoc of campsSnapshot.docs) {
+    const regsSnapshot = await campDoc.ref.collection("registrations").get()
+    for (const regDoc of regsSnapshot.docs) {
+      const familyEmails: string[] = regDoc.data().familyEmails ?? []
+      const normalized = [...new Set(familyEmails.map(normalizeEmail))]
+      if (JSON.stringify(familyEmails) !== JSON.stringify(normalized)) {
+        await regDoc.ref.update({familyEmails: normalized})
+        regCount++
+      }
+    }
+  }
+  console.log(`Normalized familyEmails on ${regCount} registration docs`)
+
+  // Admins: the email IS the doc ID, so re-key any non-lowercase docs
+  const adminsSnapshot = await db.collection("admins").get()
+  let adminCount = 0
+  for (const adminDoc of adminsSnapshot.docs) {
+    const normalizedId = normalizeEmail(adminDoc.id)
+    if (adminDoc.id !== normalizedId) {
+      await db.collection("admins").doc(normalizedId).set(adminDoc.data(), {merge: true})
+      await adminDoc.ref.delete()
+      adminCount++
+    }
+  }
+  console.log(`Re-keyed ${adminCount} admin docs to lowercase IDs`)
+}
+
 async function main() {
   console.log("Starting RBAC migration...\n")
 
@@ -84,6 +135,9 @@ async function main() {
 
   console.log("\nStep 2: Adding roles to existing admin documents...")
   await migrateAdminRoles()
+
+  console.log("\nStep 3: Normalizing email casing on families, registrations, and admins...")
+  await normalizeEmailCasing()
 
   console.log("\nMigration complete!")
   console.log(

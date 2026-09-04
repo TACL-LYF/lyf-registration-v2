@@ -1,17 +1,37 @@
 rules_version = '2';
+
+// Role checks in this file mirror ROLE_CAPABILITIES in schemas/src/admin.ts —
+// rules cannot import TS, so when a role or capability changes there, update
+// the corresponding hasRole/hasAnyRole calls here and keep validRoles() in sync.
 service cloud.firestore {
   match /databases/{database}/documents {
     function isSignedIn() {
       return request.auth != null;
     }
 
+    function validRoles() {
+      return ['full_admin', 'program_staff', 'health_staff'];
+    }
+
+    function callerAdminData() {
+      return get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data;
+    }
+
     function getRole() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role;
+      return callerAdminData().role;
     }
 
     function isAnyAdmin() {
       return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) &&
+        callerAdminData().disabled != true;
+    }
+
+    function isFullAdmin() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) &&
+        callerAdminData().disabled != true &&
+        callerAdminData().role == 'full_admin';
     }
 
     function hasRole(role) {
@@ -27,11 +47,13 @@ service cloud.firestore {
       // Any signed-in user can read their own admin doc
       allow read: if isSignedIn() && request.auth.token.email == email;
       // Full admins can read any admin doc
-      allow read: if isSignedIn() &&
-        get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role == 'full_admin';
-      // Only full admins can write
-      allow write: if isSignedIn() &&
-        get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.role == 'full_admin';
+      allow read: if isFullAdmin();
+      // Only full admins can write, and only recognized role values —
+      // functions and the client fail closed on anything else, so an
+      // unvalidated write here would silently create a no-access admin.
+      allow delete: if isFullAdmin();
+      allow create, update: if isFullAdmin() &&
+        request.resource.data.role in validRoles();
     }
 
     // Families — any admin can read; family members or full_admin can write
@@ -56,13 +78,14 @@ service cloud.firestore {
           (isSignedIn() && request.auth.token.email in
             get(/databases/$(database)/documents/families/$(familyId)).data.emails);
 
-        // Private sub-documents — role-gated
-        match /private/health {
-          allow read: if hasAnyRole(['health_staff', 'full_admin']);
+        // Private sub-documents — one match for every sensitive section.
+        // Section gates mirror PRIVATE_SECTIONS in schemas/src/families.ts:
+        // adding a new section means one condition here, nothing else.
+        match /private/{section} {
+          allow read: if
+            (section == 'health' && hasAnyRole(['health_staff', 'full_admin'])) ||
+            (section == 'demographics' && hasRole('full_admin'));
           allow write: if hasRole('full_admin');
-        }
-        match /private/demographics {
-          allow read, write: if hasRole('full_admin');
         }
       }
     }
@@ -72,11 +95,12 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if hasRole('full_admin');
 
-      // Registrations — admins can read/write all; family members can read their own
+      // Registrations — any admin can read; only roles with the
+      // writeRegistrations capability can write; family members can read their own
       match /registrations/{registrationId} {
         allow read: if isAnyAdmin() ||
           (isSignedIn() && request.auth.token.email in resource.data.familyEmails);
-        allow write: if isAnyAdmin();
+        allow write: if hasAnyRole(['program_staff', 'full_admin']);
       }
     }
 
