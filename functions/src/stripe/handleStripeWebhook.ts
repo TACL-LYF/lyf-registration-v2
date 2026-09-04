@@ -13,6 +13,7 @@ const PROCESSED_EVENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 import {
   stripeEndpointSecret,
   testStripeEndpointSecret,
+  STRIPE_APP_TAG,
   StripeWebhookEventType,
   getFirestoreDb,
   getStripe,
@@ -93,6 +94,16 @@ function handleStripeWebhookHelper(
               ],
             }
           );
+
+          // v1 and v2 share a Stripe account, so this endpoint also receives
+          // v1's checkout events. Only sessions we created carry our tag.
+          if (sessionWithLineItems.metadata?.app !== STRIPE_APP_TAG) {
+            logger.info(
+              `Ignoring session ${session.id}: not created by this app ` +
+                `(app=${sessionWithLineItems.metadata?.app ?? "none"})`
+            );
+            break;
+          }
 
           const eventType = sessionWithLineItems.metadata?.eventType ?? "-1";
 

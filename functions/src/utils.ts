@@ -4,8 +4,14 @@ import {getFirestore} from "firebase-admin/firestore";
 import {createTransport} from "nodemailer";
 config();
 
-export const db = getFirestore();
-export const testDb = getFirestore("internal-test");
+// Database IDs are configuration, not code: v2 runs in the same Firebase
+// project as v1, whose data lives in "(default)" and "internal-test".
+export const PROD_DATABASE_ID = process.env.FIRESTORE_DATABASE_ID ?? "lyf-v2";
+export const TEST_DATABASE_ID =
+  process.env.FIRESTORE_TEST_DATABASE_ID ?? "lyf-v2-test";
+
+export const db = getFirestore(PROD_DATABASE_ID);
+export const testDb = getFirestore(TEST_DATABASE_ID);
 
 export const getFirestoreDb = (isProd: boolean) => (isProd ? db : testDb);
 
@@ -25,6 +31,10 @@ export const testStripeEndpointSecret = process.env
   .STRIPE_TEST_ENDPOINT_SECRET as string;
 
 export const getStripe = (isProd: boolean) => (isProd ? stripe : testStripe);
+
+// Stamped into checkout session metadata so each app's webhook can tell its
+// own sessions from the other's while v1 and v2 share one Stripe account.
+export const STRIPE_APP_TAG = "v2";
 
 // Registration Utils
 export const getFirstName = (name: string) => name.split(" ")[0];

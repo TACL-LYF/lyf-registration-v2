@@ -15,6 +15,7 @@ import {
 
 import { firebaseFunctions } from "@utils/firebaseApp"
 import { httpsCallable } from "firebase/functions"
+import { FUNCTION_NAMES } from "lyf-registration-schemas"
 import { SnackbarAlertContext } from "@components/SnackbarAlert"
 import { MoveCampersOffWaitlistRequest } from "lyf-registration-schemas"
 import { ProdContext } from "@components/ProdContext"
@@ -45,7 +46,7 @@ const moveCampersOffWaitlist = httpsCallable<
     code: number
     message: string
   }
->(firebaseFunctions, "moveCampersOffWaitlist")
+>(firebaseFunctions, FUNCTION_NAMES.moveCampersOffWaitlist)
 
 export default function ConfirmWaitlistDialogProps({
   context,

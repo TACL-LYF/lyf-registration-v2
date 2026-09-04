@@ -20,9 +20,11 @@
  *   APPLY=1 ./run.sh -n cleanupLegacyCamperFields    (apply)
  */
 import * as admin from "firebase-admin"
+import {getFirestore} from "firebase-admin/firestore"
 
-admin.initializeApp()
-const db = admin.firestore()
+const app = admin.initializeApp()
+// v2 data lives in a named database; "(default)" belongs to v1
+const db = getFirestore(app, process.env.FIRESTORE_DATABASE_ID ?? "lyf-v2")
 
 const APPLY = process.env.APPLY === "1" || process.argv.includes("--apply")
 const HEALTH_FIELDS = ["medicalConditions", "dietAndFoodAllergies"] as const

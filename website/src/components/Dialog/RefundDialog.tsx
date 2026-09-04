@@ -20,6 +20,7 @@ import { NumberInput } from "@components/Inputs"
 import { firebaseFunctions } from "@utils/firebaseApp"
 import { updateDoc, serverTimestamp } from "firebase/firestore"
 import { httpsCallable } from "firebase/functions"
+import { FUNCTION_NAMES } from "lyf-registration-schemas"
 import { Payment } from "@utils/databaseSchema"
 import { RegistrationData } from "@hooks/useRegistrations"
 import { RegistrationStatus } from "lyf-registration-schemas"
@@ -240,7 +241,7 @@ export default function RefundDialog({
   const issueStripeRefund = httpsCallable<
     IssueStripeRefundRequest,
     IssueStripeRefundResponse
-  >(firebaseFunctions, "issueStripeRefund")
+  >(firebaseFunctions, FUNCTION_NAMES.issueStripeRefund)
 
   const handleRefunds = async () => {
     await Promise.all(

@@ -19,10 +19,15 @@ const firebaseApp = isBrowser ? initializeApp(firebaseConfig) : null
 
 export default firebaseApp
 
+// v2 shares the Firebase project with v1, whose data is in "(default)" and
+// "internal-test", so v2 reads and writes its own named databases.
+const DATABASE_ID = process.env.GATSBY_FIRESTORE_DATABASE_ID ?? "lyf-v2"
+const TEST_DATABASE_ID = process.env.GATSBY_FIRESTORE_TEST_DATABASE_ID ?? "lyf-v2-test"
+
 export const firebaseAuth = isBrowser ? getAuth(firebaseApp!) : (null as unknown as Auth)
-export const firestore = isBrowser ? getFirestore(firebaseApp!) : (null as unknown as Firestore)
+export const firestore = isBrowser ? getFirestore(firebaseApp!, DATABASE_ID) : (null as unknown as Firestore)
 export const prodFirestore = firestore
-export const testFirestore = isBrowser ? getFirestore(firebaseApp!, "internal-test") : (null as unknown as Firestore)
+export const testFirestore = isBrowser ? getFirestore(firebaseApp!, TEST_DATABASE_ID) : (null as unknown as Firestore)
 export const firebaseFunctions = isBrowser ? getFunctions(firebaseApp!, "us-west2") : (null as unknown as Functions)
 
 if (isBrowser && USE_EMULATORS) {

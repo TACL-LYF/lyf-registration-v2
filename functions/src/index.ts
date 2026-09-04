@@ -32,14 +32,18 @@ import {
   syncFamilyEmailsOnUpdateTest,
 } from "./families/syncFamilyEmails";
 
+// Deployed names carry a V2 suffix: v1's functions of the same base names still
+// run in this project and region, and Cloud Functions names are unique per
+// region. The website resolves these through FUNCTION_NAMES in the schemas
+// package — keep the two lists in sync.
 export {
-  handleStripeWebhook,
-  handleTestStripeWebhook,
-  createPreRegistrationSession,
-  createRegistrationSession,
-  moveCampersOffWaitlist,
-  issueStripeRefund,
-  manageAdmin,
-  syncFamilyEmailsOnUpdate,
-  syncFamilyEmailsOnUpdateTest,
+  handleStripeWebhook as handleStripeWebhookV2,
+  handleTestStripeWebhook as handleTestStripeWebhookV2,
+  createPreRegistrationSession as createPreRegistrationSessionV2,
+  createRegistrationSession as createRegistrationSessionV2,
+  moveCampersOffWaitlist as moveCampersOffWaitlistV2,
+  issueStripeRefund as issueStripeRefundV2,
+  manageAdmin as manageAdminV2,
+  syncFamilyEmailsOnUpdate as syncFamilyEmailsOnUpdateV2,
+  syncFamilyEmailsOnUpdateTest as syncFamilyEmailsOnUpdateTestV2,
 };

@@ -1,10 +1,11 @@
 import type { GatsbyConfig } from "gatsby"
 
+// Served from a custom domain (see static/CNAME), so no pathPrefix. Change the
+// CNAME file and this URL together at cutover.
 const config: GatsbyConfig = {
-  pathPrefix: `/lyf-registration-v2`,
   siteMetadata: {
     title: `TACL LYF Registration`,
-    siteUrl: `https://tacl-lyf.github.io/lyf-registration-v2`,
+    siteUrl: `https://v2.lyf-registration.tacl.org`,
   },
   // More easily incorporate content into your pages through automatic TypeScript type generation and better GraphQL IntelliSense.
   // If you use VSCode you can also use the GraphQL plugin

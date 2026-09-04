@@ -1,6 +1,7 @@
 import React from "react"
 import { Button, Grid, Stack, TextField, Typography } from "@mui/material"
 import { httpsCallable } from "firebase/functions"
+import { FUNCTION_NAMES } from "lyf-registration-schemas"
 
 // Schemas
 import {
@@ -50,7 +51,7 @@ type RegistrationSessionInputResponse = {
 const createRegistrationSession = httpsCallable<
   RegistrationPayload,
   RegistrationSessionInputResponse
->(firebaseFunctions, "createRegistrationSession")
+>(firebaseFunctions, FUNCTION_NAMES.createRegistrationSession)
 
 type CreateCheckoutSessionResponse = Promise<{
   success: boolean

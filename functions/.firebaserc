@@ -1,6 +1,6 @@
 {
   "projects": {
-    "default": "lyf-registration-v2"
+    "default": "lyf-registration"
   },
   "targets": {},
   "etags": {}

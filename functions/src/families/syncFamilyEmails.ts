@@ -8,6 +8,8 @@ import {
 } from "firebase-functions/v2/firestore";
 import {Camper, Family, normalizeEmails} from "lyf-registration-schemas";
 
+import {PROD_DATABASE_ID, TEST_DATABASE_ID} from "../utils";
+
 // Firestore batches cap at 500 writes
 const BATCH_SIZE = 400;
 
@@ -18,7 +20,7 @@ const BATCH_SIZE = 400;
  * whenever the membership list changes (across all camp years).
  */
 async function syncFamilyEmails(
-  databaseId: string | undefined,
+  databaseId: string,
   event: FirestoreEvent<Change<QueryDocumentSnapshot> | undefined, {familyId: string}>
 ): Promise<void> {
   if (!event.data) return;
@@ -29,7 +31,7 @@ async function syncFamilyEmails(
     before.length === after.length && before.every((e) => after.includes(e));
   if (unchanged) return;
 
-  const db = databaseId ? getFirestore(databaseId) : getFirestore();
+  const db = getFirestore(databaseId);
   const {familyId} = event.params;
 
   const campers = await db.collection(`families/${familyId}/campers`).get();
@@ -53,17 +55,16 @@ async function syncFamilyEmails(
   }
 
   logger.info(
-    `Synced familyEmails on ${existing.length} registrations for family ${familyId}` +
-      (databaseId ? ` (${databaseId})` : "")
+    `Synced familyEmails on ${existing.length} registrations for family ${familyId} (${databaseId})`
   );
 }
 
 export const syncFamilyEmailsOnUpdate = onDocumentUpdated(
-  "families/{familyId}",
-  (event) => syncFamilyEmails(undefined, event)
+  {document: "families/{familyId}", database: PROD_DATABASE_ID},
+  (event) => syncFamilyEmails(PROD_DATABASE_ID, event)
 );
 
 export const syncFamilyEmailsOnUpdateTest = onDocumentUpdated(
-  {document: "families/{familyId}", database: "internal-test"},
-  (event) => syncFamilyEmails("internal-test", event)
+  {document: "families/{familyId}", database: TEST_DATABASE_ID},
+  (event) => syncFamilyEmails(TEST_DATABASE_ID, event)
 );

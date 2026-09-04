@@ -21,6 +21,7 @@ import { collection, getDocs } from "firebase/firestore"
 import { httpsCallable } from "firebase/functions"
 import {
   ADMIN_ROLES,
+  FUNCTION_NAMES,
   AdminRole,
   ManageAdminRequest,
   ManageAdminResponse,
@@ -51,7 +52,7 @@ const ROLE_LABELS: Record<AdminRole, string> = {
 // writes to admins/ so the last-full_admin guard and audit log always apply.
 const manageAdmin = httpsCallable<ManageAdminRequest, ManageAdminResponse>(
   firebaseFunctions,
-  "manageAdmin"
+  FUNCTION_NAMES.manageAdmin
 )
 
 const errorMessage = (err: unknown, fallback: string) =>

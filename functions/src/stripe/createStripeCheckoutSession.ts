@@ -1,5 +1,5 @@
 import Stripe from "stripe";
-import {StripeWebhookEventType, getStripe} from "../utils";
+import {STRIPE_APP_TAG, StripeWebhookEventType, getStripe} from "../utils";
 
 export type LineItem<T extends Stripe.Metadata> = {
   priceInDollars: number;
@@ -62,6 +62,9 @@ export async function createStripeCheckoutSession<T extends Stripe.Metadata>(
     mode: "payment",
     metadata: {
       eventType: eventType,
+      // Lets the v2 webhook ignore sessions created by v1, which shares this
+      // Stripe account and delivers every event to both endpoints.
+      app: STRIPE_APP_TAG,
     },
     success_url: successUrl,
     cancel_url: cancelUrl,

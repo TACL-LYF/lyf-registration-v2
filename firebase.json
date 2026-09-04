@@ -1,18 +1,20 @@
 {
   "firestore": [
     {
-      "database": "(default)",
-      "rules": "firestore.rules"
+      "database": "lyf-v2",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
     },
     {
-      "database": "internal-test",
-      "rules": "firestore.rules"
+      "database": "lyf-v2-test",
+      "rules": "firestore.rules",
+      "indexes": "firestore.indexes.json"
     }
   ],
   "functions": [
     {
       "source": "functions",
-      "codebase": "default",
+      "codebase": "v2",
       "ignore": [
         "node_modules",
         ".git",

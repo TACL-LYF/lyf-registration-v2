@@ -11,11 +11,13 @@
  *   ADMIN_EMAIL=someone@tacl.org ADMIN_ROLE=health_staff ./run.sh -n grantAdminAccess
  */
 import * as admin from "firebase-admin"
+import {getFirestore} from "firebase-admin/firestore"
 
 const VALID_ROLES = ["full_admin", "program_staff", "health_staff"]
 
-admin.initializeApp()
-const db = admin.firestore()
+const app = admin.initializeApp()
+// v2 data lives in a named database; "(default)" belongs to v1
+const db = getFirestore(app, process.env.FIRESTORE_DATABASE_ID ?? "lyf-v2")
 
 async function main() {
   const email = (process.env.ADMIN_EMAIL ?? "").trim().toLowerCase()

@@ -1,5 +1,6 @@
 export * from "./admin"
 export * from "./camp"
+export * from "./functions"
 export * from "./families"
 export * from "./payments"
 export * from "./preRegistrationPayload"

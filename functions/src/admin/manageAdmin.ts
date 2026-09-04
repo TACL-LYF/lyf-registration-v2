@@ -1,4 +1,4 @@
-import {FieldValue, getFirestore} from "firebase-admin/firestore";
+import {FieldValue} from "firebase-admin/firestore";
 import {logger} from "firebase-functions";
 import {HttpsError, onCall} from "firebase-functions/v2/https";
 import {
@@ -9,6 +9,7 @@ import {
   resolveAdminRole,
 } from "lyf-registration-schemas";
 
+import {db} from "../utils";
 import {assertAdmin, callableOptions} from "../utils/auth";
 
 /**
@@ -18,7 +19,7 @@ import {assertAdmin, callableOptions} from "../utils/auth";
  *  - refuse self-demotion/removal
  *  - append an entry to `adminAuditLog`
  *
- * The roster lives in the default database only — it is global, not per
+ * The roster lives in the production database only — it is global, not per
  * test/prod data set.
  */
 export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminResponse>>(
@@ -34,7 +35,6 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
     }
     const isSelf = target === actor;
 
-    const db = getFirestore();
     const adminsRef = db.collection("admins");
     const targetRef = adminsRef.doc(target);
 

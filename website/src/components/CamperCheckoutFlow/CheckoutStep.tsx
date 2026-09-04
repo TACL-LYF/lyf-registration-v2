@@ -12,6 +12,7 @@ import {
   Typography,
 } from "@mui/material"
 import { httpsCallable } from "firebase/functions"
+import { FUNCTION_NAMES } from "lyf-registration-schemas"
 import { serverTimestamp, updateDoc } from "firebase/firestore"
 
 // Schema
@@ -79,7 +80,7 @@ export default function CheckoutStep({
     const createPreRegistrationSession = httpsCallable<
       PreRegistrationInputPayload,
       PreRegistrationResponsePayload
-    >(firebaseFunctions, "createPreRegistrationSession")
+    >(firebaseFunctions, FUNCTION_NAMES.createPreRegistrationSession)
 
     let checkoutSessionId: string | null | undefined = null
     try {

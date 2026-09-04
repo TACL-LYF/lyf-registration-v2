@@ -6,7 +6,9 @@
 # Default email: test@tacl.org
 
 FIRESTORE_HOST="http://127.0.0.1:8080"
-PROJECT_ID="lyf-registration-v2"
+PROJECT_ID="${FIREBASE_PROJECT_ID:-lyf-registration}"
+# v2 data lives in a named database; "(default)" belongs to v1
+DATABASE_ID="${FIRESTORE_DATABASE_ID:-lyf-v2}"
 EMAIL="${1:-test@tacl.org}"
 
 # "Bearer owner" bypasses all Firestore security rules in the emulator
@@ -16,7 +18,7 @@ echo "Seeding Firestore emulator at $FIRESTORE_HOST..."
 
 # Create admin document
 curl -s -X PATCH \
-  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents/admins/${EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
+  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/admins/${EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
   -H "Content-Type: application/json" \
   -H "${AUTH_HEADER}" \
   -d "{
@@ -31,7 +33,7 @@ echo "  ✔ Created admins/${EMAIL} with role: full_admin"
 # Create a second admin with program_staff role for testing
 STAFF_EMAIL="staff@tacl.org"
 curl -s -X PATCH \
-  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents/admins/${STAFF_EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
+  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/admins/${STAFF_EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
   -H "Content-Type: application/json" \
   -H "${AUTH_HEADER}" \
   -d "{
@@ -46,7 +48,7 @@ echo "  ✔ Created admins/${STAFF_EMAIL} with role: program_staff"
 # Create a third admin with health_staff role for testing
 HEALTH_EMAIL="health@tacl.org"
 curl -s -X PATCH \
-  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents/admins/${HEALTH_EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
+  "${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/admins/${HEALTH_EMAIL}?updateMask.fieldPaths=role&updateMask.fieldPaths=addedBy" \
   -H "Content-Type: application/json" \
   -H "${AUTH_HEADER}" \
   -d "{

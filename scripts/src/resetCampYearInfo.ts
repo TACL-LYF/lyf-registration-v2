@@ -1,13 +1,13 @@
 import * as admin from "firebase-admin"
+import {getFirestore} from "firebase-admin/firestore"
 import {CampTrack} from "lyf-registration-schemas"
 
-// Initialize the firebase Admin SDK so we can perform operations
-admin.initializeApp()
-const db = admin.firestore()
-
-db.settings({
-  databaseId: "internal-test",
-})
+const app = admin.initializeApp()
+// Seeds the v2 test database; "(default)"/"internal-test" belong to v1
+const db = getFirestore(
+  app,
+  process.env.FIRESTORE_TEST_DATABASE_ID ?? "lyf-v2-test"
+)
 
 async function main() {
   const campYearRef = db.collection("camps").doc("2025")

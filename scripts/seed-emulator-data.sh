@@ -6,9 +6,11 @@
 # Usage: ./scripts/seed-emulator-data.sh
 
 FIRESTORE_HOST="http://127.0.0.1:8080"
-PROJECT_ID="lyf-registration-v2"
+PROJECT_ID="${FIREBASE_PROJECT_ID:-lyf-registration}"
+# v2 data lives in a named database; "(default)" belongs to v1
+DATABASE_ID="${FIRESTORE_DATABASE_ID:-lyf-v2}"
 AUTH="Authorization: Bearer owner"
-BASE_URL="${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/(default)/documents"
+BASE_URL="${FIRESTORE_HOST}/v1/projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents"
 CAMP_YEAR="2026"
 
 echo "Seeding fake registration data into Firestore emulator..."
@@ -90,7 +92,7 @@ REG1_ID="reg-lily-2026"
 create_doc "camps/${CAMP_YEAR}/registrations/${REG1_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Lily Chen\" },
-    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY1_ID}/campers/${CAMPER1_ID}\" },
+    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/families/${FAMILY1_ID}/campers/${CAMPER1_ID}\" },
     \"campTrack\": { \"stringValue\": \"Younger\" },
     \"grade\": { \"integerValue\": \"5\" },
     \"status\": { \"stringValue\": \"Active\" },
@@ -108,7 +110,7 @@ echo "  ✔ Registration: Lily Chen (Active, Younger)"
 # Link the camper back to its registration (the registration flow does this via arrayUnion)
 create_doc "families/${FAMILY1_ID}/campers/${CAMPER1_ID}?updateMask.fieldPaths=registrations" "{
   \"fields\": {
-    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG1_ID}\"}] } }
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/camps/${CAMP_YEAR}/registrations/${REG1_ID}\"}] } }
   }
 }"
 
@@ -146,7 +148,7 @@ REG2_ID="reg-jason-2026"
 create_doc "camps/${CAMP_YEAR}/registrations/${REG2_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=cabinPreference&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Jason Chen\" },
-    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY1_ID}/campers/${CAMPER2_ID}\" },
+    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/families/${FAMILY1_ID}/campers/${CAMPER2_ID}\" },
     \"campTrack\": { \"stringValue\": \"Older\" },
     \"grade\": { \"integerValue\": \"8\" },
     \"status\": { \"stringValue\": \"Active\" },
@@ -164,7 +166,7 @@ echo "  ✔ Registration: Jason Chen (Active, Older)"
 # Link the camper back to its registration (the registration flow does this via arrayUnion)
 create_doc "families/${FAMILY1_ID}/campers/${CAMPER2_ID}?updateMask.fieldPaths=registrations" "{
   \"fields\": {
-    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG2_ID}\"}] } }
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/camps/${CAMP_YEAR}/registrations/${REG2_ID}\"}] } }
   }
 }"
 
@@ -224,7 +226,7 @@ REG3_ID="reg-emily-2026"
 create_doc "camps/${CAMP_YEAR}/registrations/${REG3_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=waitlistTime&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt&updateMask.fieldPaths=internalNotes" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Emily Lin\" },
-    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY2_ID}/campers/${CAMPER3_ID}\" },
+    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/families/${FAMILY2_ID}/campers/${CAMPER3_ID}\" },
     \"campTrack\": { \"stringValue\": \"Younger\" },
     \"grade\": { \"integerValue\": \"6\" },
     \"status\": { \"stringValue\": \"Waitlist\" },
@@ -243,7 +245,7 @@ echo "  ✔ Registration: Emily Lin (Waitlist, Younger)"
 # Link the camper back to its registration (the registration flow does this via arrayUnion)
 create_doc "families/${FAMILY2_ID}/campers/${CAMPER3_ID}?updateMask.fieldPaths=registrations" "{
   \"fields\": {
-    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG3_ID}\"}] } }
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/camps/${CAMP_YEAR}/registrations/${REG3_ID}\"}] } }
   }
 }"
 
@@ -304,7 +306,7 @@ REG4_ID="reg-kevin-2026"
 create_doc "camps/${CAMP_YEAR}/registrations/${REG4_ID}?updateMask.fieldPaths=camperName&updateMask.fieldPaths=camper&updateMask.fieldPaths=campTrack&updateMask.fieldPaths=grade&updateMask.fieldPaths=status&updateMask.fieldPaths=shirtSize&updateMask.fieldPaths=isReturning&updateMask.fieldPaths=isPreRegistered&updateMask.fieldPaths=familyEmails&updateMask.fieldPaths=createdAt&updateMask.fieldPaths=updatedAt" "{
   \"fields\": {
     \"camperName\": { \"stringValue\": \"Kevin Wang\" },
-    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/families/${FAMILY3_ID}/campers/${CAMPER4_ID}\" },
+    \"camper\": { \"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/families/${FAMILY3_ID}/campers/${CAMPER4_ID}\" },
     \"campTrack\": { \"stringValue\": \"Older\" },
     \"grade\": { \"integerValue\": \"7\" },
     \"status\": { \"stringValue\": \"Pending Payment\" },
@@ -321,7 +323,7 @@ echo "  ✔ Registration: Kevin Wang (Pending Payment, Older)"
 # Link the camper back to its registration (the registration flow does this via arrayUnion)
 create_doc "families/${FAMILY3_ID}/campers/${CAMPER4_ID}?updateMask.fieldPaths=registrations" "{
   \"fields\": {
-    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG4_ID}\"}] } }
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/${DATABASE_ID}/documents/camps/${CAMP_YEAR}/registrations/${REG4_ID}\"}] } }
   }
 }"
 

@@ -34,8 +34,11 @@ jobs:
           yarn workspace small-group-pairing build
 
       - name: Build website
-        run: yarn workspace lyf-registration-website run build --prefix-paths
+        # No --prefix-paths: the site is served from a custom domain (static/CNAME)
+        run: yarn workspace lyf-registration-website run build
         env:
+          GATSBY_FIRESTORE_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_DATABASE_ID || 'lyf-v2' }}
+          GATSBY_FIRESTORE_TEST_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_TEST_DATABASE_ID || 'lyf-v2-test' }}
           GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}
           GATSBY_FIREBASE_AUTH_DOMAIN: ${{ secrets.GATSBY_FIREBASE_AUTH_DOMAIN }}
           GATSBY_FIREBASE_PROJECT_ID: ${{ secrets.GATSBY_FIREBASE_PROJECT_ID }}

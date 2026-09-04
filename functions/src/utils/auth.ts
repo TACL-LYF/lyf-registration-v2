@@ -1,4 +1,3 @@
-import {getFirestore} from "firebase-admin/firestore";
 import {HttpsError, type CallableRequest} from "firebase-functions/v2/https";
 import {
   AdminRole,
@@ -9,10 +8,17 @@ import {
   rolesWithCapability,
 } from "lyf-registration-schemas";
 
-// Localhost is only a legitimate redirect target when running in the
-// emulator (FUNCTIONS_EMULATOR is set by the Firebase CLI).
+import {db} from "../utils";
+
+// Comma-separated list of origins Stripe may redirect back to. Configured per
+// environment so the staging host can be added without a code change.
+// Localhost is only a legitimate target when running in the emulator
+// (FUNCTIONS_EMULATOR is set by the Firebase CLI).
 const ALLOWED_REDIRECT_ORIGINS = [
-  "https://lyf-registration.tacl.org",
+  ...(process.env.ALLOWED_REDIRECT_ORIGINS ?? "https://lyf-registration.tacl.org")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
   ...(process.env.FUNCTIONS_EMULATOR === "true" ?
     ["http://localhost:8000", "http://localhost:9000"] :
     []),
@@ -40,7 +46,7 @@ async function getCallerAdminRole(
     throw new HttpsError("unauthenticated", "No email on auth token");
   }
 
-  const adminDoc = await getFirestore()
+  const adminDoc = await db
     .collection("admins")
     .doc(normalizeEmail(email))
     .get();
