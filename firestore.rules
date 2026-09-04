@@ -3,35 +3,51 @@ rules_version = '2';
 // Role checks in this file mirror ROLE_CAPABILITIES in schemas/src/admin.ts —
 // rules cannot import TS, so when a role or capability changes there, update
 // the corresponding hasRole/hasAnyRole calls here and keep validRoles() in sync.
+// The matrix is enforced by firestore-rules-tests/ (run against the emulator).
 service cloud.firestore {
   match /databases/{database}/documents {
+    // ---------- Identity helpers ----------
+
     function isSignedIn() {
       return request.auth != null;
     }
+
+    function hasEmail() {
+      return isSignedIn() && 'email' in request.auth.token;
+    }
+
+    function callerEmail() {
+      return request.auth.token.email;
+    }
+
+    // ---------- Admin role helpers ----------
 
     function validRoles() {
       return ['full_admin', 'program_staff', 'health_staff'];
     }
 
+    function adminDocPath() {
+      return /databases/$(database)/documents/admins/$(callerEmail());
+    }
+
     function callerAdminData() {
-      return get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data;
+      return get(adminDocPath()).data;
+    }
+
+    // Fails closed: a missing doc, a disabled admin, or an unrecognized role
+    // value all mean "not an admin" — matching resolveAdminRole() in the
+    // schemas package and assertAdmin() in functions.
+    // Note: rules error (→ deny) on reading a missing property, so optional
+    // fields are read with .get(key, default).
+    function isAnyAdmin() {
+      return hasEmail() &&
+        exists(adminDocPath()) &&
+        callerAdminData().get('disabled', false) != true &&
+        callerAdminData().get('role', '') in validRoles();
     }
 
     function getRole() {
-      return callerAdminData().role;
-    }
-
-    function isAnyAdmin() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) &&
-        callerAdminData().disabled != true;
-    }
-
-    function isFullAdmin() {
-      return isSignedIn() &&
-        exists(/databases/$(database)/documents/admins/$(request.auth.token.email)) &&
-        callerAdminData().disabled != true &&
-        callerAdminData().role == 'full_admin';
+      return callerAdminData().get('role', '');
     }
 
     function hasRole(role) {
@@ -42,81 +58,140 @@ service cloud.firestore {
       return isAnyAdmin() && getRole() in roles;
     }
 
-    // Admin roster — split into separate allow statements to avoid circular evaluation
-    match /admins/{email} {
-      // Any signed-in user can read their own admin doc
-      allow read: if isSignedIn() && request.auth.token.email == email;
-      // Full admins can read any admin doc
-      allow read: if isFullAdmin();
-      // Only full admins can write, and only recognized role values —
-      // functions and the client fail closed on anything else, so an
-      // unvalidated write here would silently create a no-access admin.
-      allow delete: if isFullAdmin();
-      allow create, update: if isFullAdmin() &&
-        request.resource.data.role in validRoles();
+    function isFullAdmin() {
+      return hasRole('full_admin');
     }
 
-    // Families — any admin can read; family members or full_admin can write
+    // ---------- Family ownership helpers ----------
+
+    function familyEmails(familyId) {
+      return get(/databases/$(database)/documents/families/$(familyId)).data.emails;
+    }
+
+    function isFamilyMember(familyId) {
+      return hasEmail() && callerEmail() in familyEmails(familyId);
+    }
+
+    function isMemberOfResourceFamily() {
+      return hasEmail() && callerEmail() in resource.data.emails;
+    }
+
+    // True when an update touches only the listed keys.
+    function onlyUpdates(keys) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
+    }
+
+    // Fields a parent may set on their own camper. Health and demographics
+    // are deliberately absent — they live under private/ and are gated there.
+    function camperProfileKeys() {
+      return ['firstName', 'lastName', 'preferredName', 'birthDate', 'gender',
+              'pronouns', 'email', 'returning', 'registrations', 'schemaVersion'];
+    }
+
+    // ---------- Admin roster ----------
+
+    // Read-only from the client. All roster mutations go through the
+    // manageAdmin callable (Admin SDK bypasses rules) so the last-full_admin
+    // guard and the audit log cannot be skipped.
+    match /admins/{email} {
+      // Any signed-in user can read their own admin doc (how the client
+      // learns its role)
+      allow read: if hasEmail() && callerEmail() == email;
+      // Full admins can read the whole roster
+      allow read: if isFullAdmin();
+      allow write: if false;
+    }
+
+    // ---------- Families ----------
+
     match /families/{familyId} {
-      allow read: if isAnyAdmin() ||
-        (isSignedIn() && request.auth.token.email in resource.data.emails);
-      allow write: if hasRole('full_admin') ||
-        (isSignedIn() && request.auth.token.email in resource.data.emails);
+      allow read: if isAnyAdmin() || isMemberOfResourceFamily();
+      allow create, delete: if isFullAdmin();
+      // Family members may edit address/household details only. `emails`
+      // (membership) and `registrations` are function-managed.
+      allow update: if isFullAdmin() ||
+        (isMemberOfResourceFamily() &&
+          onlyUpdates(['street', 'suite', 'city', 'state', 'zip', 'country', 'household']));
 
       match /parents/{parentId} {
-        allow read: if isAnyAdmin() ||
-          (isSignedIn() && request.auth.token.email in
-            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
-        allow write: if hasRole('full_admin');
+        allow read: if isAnyAdmin() || isFamilyMember(familyId);
+        allow write: if isFullAdmin();
       }
 
       match /campers/{camperId} {
-        allow read: if isAnyAdmin() ||
-          (isSignedIn() && request.auth.token.email in
-            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
-        allow write: if hasRole('full_admin') ||
-          (isSignedIn() && request.auth.token.email in
-            get(/databases/$(database)/documents/families/$(familyId)).data.emails);
+        allow read: if isAnyAdmin() || isFamilyMember(familyId);
+        allow write: if isFullAdmin();
+        // Parents may add campers and edit profile fields. A new camper
+        // cannot arrive with registrations attached.
+        allow create: if isFamilyMember(familyId) &&
+          request.resource.data.keys().hasOnly(camperProfileKeys()) &&
+          (!('registrations' in request.resource.data) ||
+            request.resource.data.registrations.size() == 0);
+        allow update: if isFamilyMember(familyId) &&
+          onlyUpdates(camperProfileKeys().removeAll(['registrations', 'schemaVersion']));
 
         // Private sub-documents — one match for every sensitive section.
         // Section gates mirror PRIVATE_SECTIONS in schemas/src/families.ts:
         // adding a new section means one condition here, nothing else.
         match /private/{section} {
           allow read: if
-            (section == 'health' && hasAnyRole(['health_staff', 'full_admin'])) ||
-            (section == 'demographics' && hasRole('full_admin'));
-          allow write: if hasRole('full_admin');
+            (section == 'health' &&
+              (hasAnyRole(['health_staff', 'full_admin']) || isFamilyMember(familyId))) ||
+            (section == 'demographics' && isFullAdmin());
+          allow write: if isFullAdmin();
+          // Parents own their child's health info and may keep it current.
+          allow create, update: if section == 'health' &&
+            isFamilyMember(familyId) &&
+            request.resource.data.keys().hasOnly(['dietAndFoodAllergies', 'medicalConditions']);
         }
       }
     }
 
-    // Camp year document — any signed-in user can read camp info (pricing, spots)
+    // ---------- Camp years & registrations ----------
+
+    // Any signed-in user can read camp info (pricing, dates, remaining spots)
     match /camps/{campYear} {
       allow read: if isSignedIn();
-      allow write: if hasRole('full_admin');
+      allow write: if isFullAdmin();
 
-      // Registrations — any admin can read; only roles with the
-      // writeRegistrations capability can write; family members can read their own
       match /registrations/{registrationId} {
         allow read: if isAnyAdmin() ||
-          (isSignedIn() && request.auth.token.email in resource.data.familyEmails);
-        allow write: if hasAnyRole(['program_staff', 'full_admin']);
+          (hasEmail() && callerEmail() in resource.data.familyEmails);
+        allow create, delete: if isFullAdmin();
+        allow update: if isFullAdmin();
+        // writeRegistrations capability: program_staff may edit the
+        // operational fields the admin console exposes, nothing structural
+        // (camper ref, payments, familyEmails, waiver, pricing state).
+        allow update: if hasRole('program_staff') &&
+          onlyUpdates(['status', 'internalNotes', 'hasContacted', 'isCheckedOut',
+                       'nameOfParentCheckedOut', 'checkedOutTime', 'smallGroup',
+                       'cabinPreference', 'updatedAt']);
+        // Parents may edit what the profile page and checkout flow expose.
+        allow update: if hasEmail() &&
+          callerEmail() in resource.data.familyEmails &&
+          onlyUpdates(['shirtSize', 'additionalNotes', 'isCheckedOut',
+                       'nameOfParentCheckedOut', 'checkedOutTime', 'updatedAt']);
       }
     }
 
-    // Payments — full_admin only
+    // ---------- Money ----------
+
     match /payments/{paymentId} {
-      allow read, write: if hasRole('full_admin');
+      allow read, write: if isFullAdmin();
     }
 
-    // Credits — full_admin only
     match /credits/{familyId} {
-      allow read, write: if hasRole('full_admin');
+      allow read, write: if isFullAdmin();
     }
 
-    // Catch-all: full_admin fallback for any other paths
+    // ---------- Everything else ----------
+
+    // Server-only collections (_processedEvents, adminAuditLog, ...) and any
+    // future collection: full admins may inspect, nobody writes from the
+    // client. Add an explicit match above before exposing a new collection.
     match /{document=**} {
-      allow read, write: if hasRole('full_admin');
+      allow read: if isFullAdmin();
+      allow write: if false;
     }
   }
 }

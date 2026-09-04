@@ -26,7 +26,8 @@ import { Dayjs } from "dayjs"
 
 // Utils
 import { Camper } from "@utils/databaseSchema"
-import { CollectionReference, addDoc } from "firebase/firestore"
+import { CamperHealth } from "lyf-registration-schemas"
+import { CollectionReference, addDoc, doc, setDoc } from "firebase/firestore"
 import { SnackbarAlertContext } from "@components/SnackbarAlert"
 
 const genderOptions = [
@@ -60,7 +61,7 @@ type AddCamperActionType = {
   value: string | string[] | Dayjs
 }
 
-type CamperWithoutDocumentId = Omit<Camper, "ref" | "id">
+type CamperWithoutDocumentId = Omit<Camper, "ref" | "id"> & CamperHealth
 
 function addCamperReducer(
   state: CamperWithoutDocumentId,
@@ -164,7 +165,14 @@ export default function AddCamper({
     setIsLoading(true)
 
     try {
-      await addDoc(familyCampersRef, state)
+      // Health is role-gated in campers/{id}/private/health; the rules reject
+      // health fields on the camper doc itself.
+      const { dietAndFoodAllergies, medicalConditions, ...camperProfile } = state
+      const camperRef = await addDoc(familyCampersRef, camperProfile)
+      await setDoc(doc(camperRef, "private", "health"), {
+        dietAndFoodAllergies: dietAndFoodAllergies ?? null,
+        medicalConditions: medicalConditions ?? null,
+      })
       dispatch({ type: AddCamperActions.Reset, value: "" })
       setIsOpen(false)
       setError(null)

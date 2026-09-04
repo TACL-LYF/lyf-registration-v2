@@ -105,6 +105,13 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG1_ID}?updateMask.fieldPaths=ca
 }"
 echo "  ✔ Registration: Lily Chen (Active, Younger)"
 
+# Link the camper back to its registration (the registration flow does this via arrayUnion)
+create_doc "families/${FAMILY1_ID}/campers/${CAMPER1_ID}?updateMask.fieldPaths=registrations" "{
+  \"fields\": {
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG1_ID}\"}] } }
+  }
+}"
+
 # Camper 2: Jason Chen
 CAMPER2_ID="camper-jason-001"
 create_doc "families/${FAMILY1_ID}/campers/${CAMPER2_ID}?updateMask.fieldPaths=firstName&updateMask.fieldPaths=lastName&updateMask.fieldPaths=preferredName&updateMask.fieldPaths=birthDate&updateMask.fieldPaths=gender&updateMask.fieldPaths=pronouns" '{
@@ -153,6 +160,13 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG2_ID}?updateMask.fieldPaths=ca
   }
 }"
 echo "  ✔ Registration: Jason Chen (Active, Older)"
+
+# Link the camper back to its registration (the registration flow does this via arrayUnion)
+create_doc "families/${FAMILY1_ID}/campers/${CAMPER2_ID}?updateMask.fieldPaths=registrations" "{
+  \"fields\": {
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG2_ID}\"}] } }
+  }
+}"
 
 # --- Family 2: Lin family with 1 camper (waitlisted) ---
 FAMILY2_ID="family-lin-002"
@@ -226,6 +240,13 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG3_ID}?updateMask.fieldPaths=ca
 }"
 echo "  ✔ Registration: Emily Lin (Waitlist, Younger)"
 
+# Link the camper back to its registration (the registration flow does this via arrayUnion)
+create_doc "families/${FAMILY2_ID}/campers/${CAMPER3_ID}?updateMask.fieldPaths=registrations" "{
+  \"fields\": {
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG3_ID}\"}] } }
+  }
+}"
+
 # --- Family 3: Wang family with 1 camper (pending payment) ---
 FAMILY3_ID="family-wang-003"
 
@@ -296,6 +317,13 @@ create_doc "camps/${CAMP_YEAR}/registrations/${REG4_ID}?updateMask.fieldPaths=ca
   }
 }"
 echo "  ✔ Registration: Kevin Wang (Pending Payment, Older)"
+
+# Link the camper back to its registration (the registration flow does this via arrayUnion)
+create_doc "families/${FAMILY3_ID}/campers/${CAMPER4_ID}?updateMask.fieldPaths=registrations" "{
+  \"fields\": {
+    \"registrations\": { \"arrayValue\": { \"values\": [{\"referenceValue\": \"projects/${PROJECT_ID}/databases/(default)/documents/camps/${CAMP_YEAR}/registrations/${REG4_ID}\"}] } }
+  }
+}"
 
 # --- Camp year config ---
 create_doc "camps/${CAMP_YEAR}?updateMask.fieldPaths=name&updateMask.fieldPaths=campsite&updateMask.fieldPaths=registrationFee&updateMask.fieldPaths=remainingSpots" '{

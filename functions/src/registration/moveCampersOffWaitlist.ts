@@ -20,7 +20,10 @@ import {
   MoveCampersOffWaitlistRequest,
 } from "lyf-registration-schemas";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
-import {assertAdmin} from "../utils/auth";
+import {
+  assertAdmin,
+  callableOptions,
+} from "../utils/auth";
 import mjml2html from "mjml";
 
 // Ensure that all variables wrapped in {{}} are represented here
@@ -46,7 +49,7 @@ const htmlTemplate = mjml2html(mjmlTemplate, {
  * an email to the parent informing their campers are off the waitlist.
  */
 export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
-  {cors: true},
+  callableOptions,
   async (request) => {
     await assertAdmin(request, "manageWaitlist");
 

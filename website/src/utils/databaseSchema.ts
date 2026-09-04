@@ -39,8 +39,9 @@ export type Camper = DocumentId &
 
     email: string
     gender: string[]
-    dietAndFoodAllergies: string
-    medicalConditions: string
+    // Health fields (dietAndFoodAllergies, medicalConditions) are NOT on the
+    // camper doc since schemaVersion 2 — they live at
+    // campers/{id}/private/health. See CamperHealth in lyf-registration-schemas.
     registrations: DocumentReference<Registration>[]
     returning: boolean
   }>

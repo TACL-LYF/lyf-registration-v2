@@ -3,7 +3,12 @@ import Stripe from "stripe";
 import {logger} from "firebase-functions";
 import {onRequest, Request} from "firebase-functions/v2/https";
 import {Response} from "express";
-import {FieldValue} from "firebase-admin/firestore";
+import {FieldValue, Timestamp} from "firebase-admin/firestore";
+
+// gRPC status code returned by DocumentReference.create() when the doc exists
+const GRPC_ALREADY_EXISTS = 6;
+// Stripe retries webhooks for up to 3 days; keep claims well past that.
+const PROCESSED_EVENT_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
 
 import {
   stripeEndpointSecret,
@@ -47,13 +52,30 @@ function handleStripeWebhookHelper(
       return;
     }
 
-    // Idempotency: skip if this event has already been processed
+    // Idempotency: atomically claim the event ID before doing any work.
+    // create() fails if the doc exists, so two concurrent deliveries of the
+    // same event (Stripe retries aggressively) can't both get past this line
+    // the way a get-then-set check could.
     const eventRef = db.collection("_processedEvents").doc(event.id);
-    const eventDoc = await eventRef.get();
-    if (eventDoc.exists) {
-      logger.info(`Event ${event.id} already processed, skipping`);
-      response.status(200).json({received: true}).send();
-      return;
+    try {
+      await eventRef.create({
+        type: event.type,
+        receivedAt: FieldValue.serverTimestamp(),
+        // Attach a Firestore TTL policy to this field so the collection
+        // doesn't grow forever:
+        //   gcloud firestore fields ttls update expiresAt \
+        //     --collection-group=_processedEvents --enable-ttl
+        expiresAt: Timestamp.fromMillis(
+          Date.now() + PROCESSED_EVENT_RETENTION_MS
+        ),
+      });
+    } catch (err) {
+      if ((err as {code?: number}).code === GRPC_ALREADY_EXISTS) {
+        logger.info(`Event ${event.id} already processed, skipping`);
+        response.status(200).json({received: true}).send();
+        return;
+      }
+      throw err;
     }
 
     try {
@@ -117,15 +139,13 @@ function handleStripeWebhookHelper(
       Sentry.captureException(error);
       logger.error("Failed to handle the event: ", error);
       sendMessageToRegistrationErrorMessages("Failed to handle an event");
+      // Release the claim so Stripe's retry can reprocess this event.
+      await eventRef.delete().catch((e) => logger.error(e));
       response.status(500).send();
       return;
     }
 
-    // Mark event as processed for idempotency
-    await eventRef.set({
-      type: event.type,
-      processedAt: FieldValue.serverTimestamp(),
-    });
+    await eventRef.update({processedAt: FieldValue.serverTimestamp()});
 
     response
       .status(200)

@@ -85,3 +85,35 @@ export function roleHasCapability(
 export function rolesWithCapability(capability: Capability): AdminRole[] {
   return ADMIN_ROLES.filter((role) => ROLE_CAPABILITIES[role][capability])
 }
+
+// ---- manageAdmin callable ----
+// Roster changes are never written from the client; they go through the
+// `manageAdmin` Cloud Function so the last-full_admin guard and audit log
+// apply to every path.
+
+export type ManageAdminAction = "add" | "setRole" | "setDisabled" | "remove"
+
+export type ManageAdminRequest = {
+  action: ManageAdminAction
+  email: string
+  /** Required for "add" and "setRole" */
+  role?: AdminRole
+  /** Required for "setDisabled" */
+  disabled?: boolean
+}
+
+export type ManageAdminResponse = {
+  status: "success"
+  action: ManageAdminAction
+  email: string
+}
+
+// Stored at: adminAuditLog/{autoId} — append-only, server-written
+export type AdminAuditLogEntry = {
+  actor: string
+  action: ManageAdminAction
+  target: string
+  before: Admin | null
+  after: Admin | null
+  at: TimestampLike
+}

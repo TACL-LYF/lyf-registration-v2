@@ -1,7 +1,7 @@
 import React from "react"
 import { PageProps } from "gatsby"
 import dayjs from "dayjs"
-import { updateDoc } from "firebase/firestore"
+import { doc, setDoc, updateDoc } from "firebase/firestore"
 import { Box, Chip, Stack, Tooltip, Typography, useTheme } from "@mui/material"
 import {
   DataGrid,
@@ -157,6 +157,10 @@ const columns: GridColDef[] = [
   },
 ]
 
+// Which document each editable column is stored on
+const REGISTRATION_FIELDS = new Set(["shirtSize"])
+const HEALTH_FIELDS = new Set(["dietAndFoodAllergies", "medicalConditions"])
+
 const editableColumns: GridColDef[] = [
   {
     field: "shirtSize",
@@ -222,8 +226,8 @@ const ProfilePage: React.FC<PageProps> = () => {
           birthday: camper.birthDate,
           grade: reg.grade,
           shirtSize: reg.shirtSize || "",
-          dietAndFoodAllergies: (camper as any).dietAndFoodAllergies || "",
-          medicalConditions: (camper as any).medicalConditions || "",
+          dietAndFoodAllergies: camper.health?.dietAndFoodAllergies || "",
+          medicalConditions: camper.health?.medicalConditions || "",
           createdAt: reg.createdAt?.toDate() || "",
           campTrack: reg.campTrack || "N/A",
           status: [reg.status, reg.waitlistPosition, reg.campTrack],
@@ -280,24 +284,32 @@ const ProfilePage: React.FC<PageProps> = () => {
   ): Promise<ParentDashboardRow> => {
     const registration = familyData.registrations.get(newRow.registrationId)
     const camper = campers.get(newRow.camperId)
-    const registrationUpdate = []
-    const camperUpdate = []
+    const registrationUpdate: [string, unknown][] = []
+    const healthUpdate: [string, unknown][] = []
+    const camperUpdate: [string, unknown][] = []
 
     setSaving(true)
     editableColumns.forEach((column) => {
-      /*
-       * Assumes that if a field is not present in the Registration document,
-       * then it must be present in the Camper document
-       */
       const field = column.field
-      if (newRow[field] !== oldRow[field]) {
-        registration[field]
-          ? registrationUpdate.push([field, newRow[field]])
-          : camperUpdate.push([field, newRow[field]])
+      if (newRow[field] === oldRow[field]) return
+      if (REGISTRATION_FIELDS.has(field)) {
+        registrationUpdate.push([field, newRow[field]])
+      } else if (HEALTH_FIELDS.has(field)) {
+        healthUpdate.push([field, newRow[field]])
+      } else {
+        camperUpdate.push([field, newRow[field]])
       }
     })
     if (registrationUpdate.length > 0) {
       await updateDoc(registration.ref, Object.fromEntries(registrationUpdate))
+    }
+    if (healthUpdate.length > 0) {
+      // Health is role-gated in its own sub-document, never on the camper doc
+      await setDoc(
+        doc(firestore, `${camper.ref.path}/private/health`),
+        Object.fromEntries(healthUpdate),
+        { merge: true }
+      )
     }
     if (camperUpdate.length > 0) {
       await updateDoc(camper.ref, Object.fromEntries(camperUpdate))

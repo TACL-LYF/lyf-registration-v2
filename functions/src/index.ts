@@ -23,6 +23,15 @@ import {moveCampersOffWaitlist} from "./registration/moveCampersOffWaitlist";
 // Import our function for issuing a refund for a given Stripe checkout session ID
 import {issueStripeRefund} from "./stripe/issueStripeRefund";
 
+// Import our function for managing the admin roster (the only write path to admins/)
+import {manageAdmin} from "./admin/manageAdmin";
+
+// Import our triggers that keep Registration.familyEmails in sync with Family.emails
+import {
+  syncFamilyEmailsOnUpdate,
+  syncFamilyEmailsOnUpdateTest,
+} from "./families/syncFamilyEmails";
+
 export {
   handleStripeWebhook,
   handleTestStripeWebhook,
@@ -30,4 +39,7 @@ export {
   createRegistrationSession,
   moveCampersOffWaitlist,
   issueStripeRefund,
+  manageAdmin,
+  syncFamilyEmailsOnUpdate,
+  syncFamilyEmailsOnUpdateTest,
 };

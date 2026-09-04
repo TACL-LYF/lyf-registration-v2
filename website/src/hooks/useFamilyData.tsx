@@ -17,6 +17,7 @@ import { User } from "firebase/auth"
 // Utils
 import {
   Camper,
+  CamperHealth,
   Family,
   Parent,
   Registration,
@@ -26,6 +27,12 @@ import {
 export type DocumentIdWithType<T> = T & {
   ref: DocumentReference<T>
   id: string
+}
+
+// Health lives in a role-gated sub-document (campers/{id}/private/health);
+// family members may read and update it, so it's loaded alongside the camper.
+export type CamperWithHealth = DocumentIdWithType<Camper> & {
+  health: CamperHealth
 }
 
 type UseFamilyDataProps = {
@@ -49,7 +56,7 @@ export type RegistrationDocumentWithCamperId =
 export type FamilyData = {
   family: DocumentIdWithType<Family> | null
   parents: DocumentIdWithType<Parent>[]
-  campers: DocumentIdWithType<Camper>[]
+  campers: CamperWithHealth[]
   registrations: Map<string, RegistrationDocumentWithCamperId>
   campCredit: number
 }
@@ -78,7 +85,7 @@ export default function useFamilyData({
   // Store the data in various maps.
   const [family, setFamily] = useState<DocumentIdWithType<Family> | null>(null)
   const [campers, setCampers] =
-    useState<Map<string, DocumentIdWithType<Camper>>>(createMap)
+    useState<Map<string, CamperWithHealth>>(createMap)
   const [parents, setParents] =
     useState<Map<string, DocumentIdWithType<Parent>>>(createMap)
   const [registrations, setRegistrations] =
@@ -175,10 +182,20 @@ export default function useFamilyData({
 
             await Promise.all(
               camperSnapshot.docChanges().map(async (camper) => {
-                const data = {
+                let health: CamperHealth = {}
+                try {
+                  const healthDoc = await getDoc(
+                    doc(firestore, `${camper.doc.ref.path}/private/health`)
+                  )
+                  if (healthDoc.exists()) health = healthDoc.data() as CamperHealth
+                } catch {
+                  // Not readable — leave empty
+                }
+                const data: CamperWithHealth = {
                   ...camper.doc.data(),
                   ref: camper.doc.ref,
                   id: camper.doc.id,
+                  health,
                 }
                 newCamperMap.set(camper.doc.id, data)
 
@@ -265,9 +282,10 @@ export default function useFamilyData({
       return
     }
 
+    // A camper that has never registered has no `registrations` field
     const camperRegistrations = Array.from(campers)
       .reduce(
-        (prev, [, c]) => prev.concat(c.registrations),
+        (prev, [, c]) => prev.concat(c.registrations ?? []),
         new Array<DocumentReference<Registration>>()
       )
       .map((r) => r.id)

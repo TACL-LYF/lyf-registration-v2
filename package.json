@@ -10,6 +10,7 @@
     "compile": "tsc --build --force tsconfig.json"
   },
   "workspaces": [
+    "firestore-rules-tests",
     "functions",
     "schemas",
     "scripts",

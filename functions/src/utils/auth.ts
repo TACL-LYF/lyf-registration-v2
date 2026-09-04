@@ -9,11 +9,19 @@ import {
   rolesWithCapability,
 } from "lyf-registration-schemas";
 
+// Localhost is only a legitimate redirect target when running in the
+// emulator (FUNCTIONS_EMULATOR is set by the Firebase CLI).
 const ALLOWED_REDIRECT_ORIGINS = [
   "https://lyf-registration.tacl.org",
-  "http://localhost:8000",
-  "http://localhost:9000",
+  ...(process.env.FUNCTIONS_EMULATOR === "true" ?
+    ["http://localhost:8000", "http://localhost:9000"] :
+    []),
 ];
+
+/** Shared options for every onCall function. */
+export const callableOptions = {
+  cors: true,
+};
 
 /**
  * Looks up the caller's admin role from the `admins` Firestore collection.

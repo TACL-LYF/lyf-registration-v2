@@ -5,7 +5,11 @@ import {HttpsError, onCall} from "firebase-functions/v2/https";
 // Utils
 import {getStripe} from "../utils";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
-import {assertAdmin, validateDollarAmount} from "../utils/auth";
+import {
+  assertAdmin,
+  callableOptions,
+  validateDollarAmount,
+} from "../utils/auth";
 
 type IssueStripeRefundRequest = {
   stripeId: string;
@@ -21,7 +25,7 @@ type IssueStripeRefundRequest = {
  * @returns Code 200 if successful, 402 if any error occurs
  */
 export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
-  {cors: true},
+  callableOptions,
   async (request) => {
     await assertAdmin(request, "managePayments");
 

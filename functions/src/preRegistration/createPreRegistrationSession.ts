@@ -11,9 +11,10 @@ import {
 import {getStripeCustomerId} from "../registrationUtils";
 import {getFirestoreDb, StripeWebhookEventType} from "../utils";
 import {
-  validateRedirectUrl,
+  callableOptions,
   resolveTestDataFlag,
   validateDollarAmount,
+  validateRedirectUrl,
 } from "../utils/auth";
 
 // Import schema
@@ -30,7 +31,7 @@ export interface PreRegistrationLineItemMetadata extends Stripe.Metadata {
 }
 
 export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
-  {cors: true},
+  callableOptions,
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Not signed in");

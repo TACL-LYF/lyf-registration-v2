@@ -17,9 +17,10 @@ import {createDiscountName, getStripeCustomerId} from "../registrationUtils";
 import {createRegistrationDonationSession} from "../donation/createDonationSession";
 import {createOrUpdateRegistration} from "./createOrUpdateRegistration";
 import {
-  validateRedirectUrl,
+  callableOptions,
   resolveTestDataFlag,
   validateDollarAmount,
+  validateRedirectUrl,
 } from "../utils/auth";
 
 // Import schema
@@ -42,7 +43,7 @@ export interface RegistrationLineItemMetadata extends Stripe.Metadata {
 }
 
 export const createRegistrationSession = onCall<RegistrationPayload>(
-  {cors: true},
+  callableOptions,
   async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Not signed in");
