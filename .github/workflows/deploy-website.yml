@@ -34,9 +34,17 @@ jobs:
           yarn workspace small-group-pairing build
 
       - name: Build website
-        # No --prefix-paths: the site is served from a custom domain (static/CNAME)
-        run: yarn workspace lyf-registration-website run build
+        # GATSBY_CUSTOM_DOMAIN unset  -> github.io/<repo> hosting, assets prefixed
+        # GATSBY_CUSTOM_DOMAIN set    -> custom-domain hosting at the root + CNAME
+        run: |
+          if [ -n "$GATSBY_CUSTOM_DOMAIN" ]; then
+            yarn workspace lyf-registration-website run build
+            echo "$GATSBY_CUSTOM_DOMAIN" > website/public/CNAME
+          else
+            yarn workspace lyf-registration-website run build --prefix-paths
+          fi
         env:
+          GATSBY_CUSTOM_DOMAIN: ${{ vars.GATSBY_CUSTOM_DOMAIN }}
           GATSBY_FIRESTORE_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_DATABASE_ID || 'lyf-v2' }}
           GATSBY_FIRESTORE_TEST_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_TEST_DATABASE_ID || 'lyf-v2-test' }}
           GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}

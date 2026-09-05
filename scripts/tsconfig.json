@@ -12,7 +12,8 @@
     "strict": true,
     "target": "ESNext",
     "rootDir": "src",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "types": ["node"]
   },
   "compileOnSave": true,
   "include": ["src"]
