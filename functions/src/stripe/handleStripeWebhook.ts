@@ -24,6 +24,7 @@ import {
   sendMessageToRegistrationErrorMessages,
   sendMessageToRegistrationForCampChannel,
 } from "../slack/slackChannelWebhooks";
+import {withSentryRequest} from "../utils/sentry";
 
 /**
  * A wrapper around the anonymous function handler used in onRequest. This wrapper
@@ -172,10 +173,16 @@ const webhookOptions = {cors: false, invoker: "public" as const};
 
 export const handleStripeWebhook = onRequest(
   webhookOptions,
-  handleStripeWebhookHelper(true /* isProd */)
+  withSentryRequest(
+    "handleStripeWebhook",
+    handleStripeWebhookHelper(true /* isProd */)
+  )
 );
 
 export const handleTestStripeWebhook = onRequest(
   webhookOptions,
-  handleStripeWebhookHelper(false /* isProd */)
+  withSentryRequest(
+    "handleTestStripeWebhook",
+    handleStripeWebhookHelper(false /* isProd */)
+  )
 );

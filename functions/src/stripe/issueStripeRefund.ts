@@ -10,6 +10,7 @@ import {
   callableOptions,
   validateDollarAmount,
 } from "../utils/auth";
+import {withSentryCallable} from "../utils/sentry";
 
 type IssueStripeRefundRequest = {
   stripeId: string;
@@ -26,7 +27,7 @@ type IssueStripeRefundRequest = {
  */
 export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
   callableOptions,
-  async (request) => {
+  withSentryCallable("issueStripeRefund", async (request) => {
     await assertAdmin(request, "managePayments");
 
     const {stripeId, amount} = request.data;
@@ -81,5 +82,5 @@ export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
         message: "failed to create refund",
       };
     }
-  }
+  })
 );
