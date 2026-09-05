@@ -33,7 +33,10 @@ async function checkAdminStatus(email: string | null): Promise<AdminCheck> {
     // Fail closed: a missing or unrecognized role value grants nothing.
     const role = resolveAdminRole(adminDoc.data()?.role)
     return { isAdmin: role !== null, role }
-  } catch {
+  } catch (err) {
+    // Still fail closed, but never silently: a transport or rules failure here
+    // is indistinguishable from "not an admin" in the UI otherwise.
+    console.error("[auth] admin role lookup failed; treating as non-admin", err)
     return { isAdmin: false, role: null }
   }
 }
