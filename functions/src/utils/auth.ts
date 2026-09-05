@@ -24,9 +24,17 @@ const ALLOWED_REDIRECT_ORIGINS = [
     []),
 ];
 
-/** Shared options for every onCall function. */
+/**
+ * Shared options for every onCall function.
+ *
+ * `invoker: "public"` makes the deploy grant allUsers the Cloud Run invoker
+ * role. Callables must be reachable anonymously at the HTTP layer — Firebase
+ * Auth is verified inside the function (assertAdmin / request.auth), not by
+ * Cloud Run IAM. Without it the browser gets an opaque "internal" error.
+ */
 export const callableOptions = {
   cors: true,
+  invoker: "public" as const,
 };
 
 /**

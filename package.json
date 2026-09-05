@@ -7,7 +7,11 @@
   "private": true,
   "scripts": {
     "postinstall": "husky",
-    "compile": "tsc --build --force tsconfig.json"
+    "compile": "tsc --build --force tsconfig.json",
+    "functions:isolate": "yarn workspace lyf-registration-schemas build && yarn --cwd functions run build && yarn --cwd functions run isolate && cp functions/.env functions/isolate/.env",
+    "emulators": "yarn functions:isolate && firebase emulators:start",
+    "deploy:functions": "firebase deploy --only functions:v2 --project lyf-registration",
+    "deploy:firestore": "firebase deploy --only firestore --project lyf-registration"
   },
   "workspaces": [
     "firestore-rules-tests",

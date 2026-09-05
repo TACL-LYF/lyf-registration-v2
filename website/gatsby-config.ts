@@ -1,11 +1,23 @@
 import type { GatsbyConfig } from "gatsby"
 
-// Served from a custom domain (see static/CNAME), so no pathPrefix. Change the
-// CNAME file and this URL together at cutover.
+// Hosting mode is decided by GATSBY_CUSTOM_DOMAIN (set as a GitHub Actions
+// repository variable):
+//   unset  -> served from tacl-lyf.github.io/lyf-registration-v2, so assets
+//             need the repo-name prefix (build with --prefix-paths)
+//   set    -> served from that domain at the root; the deploy workflow also
+//             writes it into public/CNAME
+// Staging is v2.lyf-registration.tacl.org; at cutover change the variable to
+// lyf-registration.tacl.org. No code change either way.
+const customDomain = process.env.GATSBY_CUSTOM_DOMAIN
+const repoPrefix = `/lyf-registration-v2`
+
 const config: GatsbyConfig = {
+  ...(customDomain ? {} : { pathPrefix: repoPrefix }),
   siteMetadata: {
     title: `TACL LYF Registration`,
-    siteUrl: `https://v2.lyf-registration.tacl.org`,
+    siteUrl: customDomain
+      ? `https://${customDomain}`
+      : `https://tacl-lyf.github.io${repoPrefix}`,
   },
   // More easily incorporate content into your pages through automatic TypeScript type generation and better GraphQL IntelliSense.
   // If you use VSCode you can also use the GraphQL plugin

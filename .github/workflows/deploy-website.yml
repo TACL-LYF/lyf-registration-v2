@@ -33,10 +33,35 @@ jobs:
           yarn workspace lyf-registration-schemas build
           yarn workspace small-group-pairing build
 
-      - name: Build website
-        # No --prefix-paths: the site is served from a custom domain (static/CNAME)
-        run: yarn workspace lyf-registration-website run build
+      # Secrets are not inherited by forks; an empty API key builds fine but the
+      # deployed app crashes on load with auth/invalid-api-key. Fail here instead.
+      - name: Check Firebase config is present
+        run: |
+          for v in GATSBY_FIREBASE_API_KEY GATSBY_FIREBASE_AUTH_DOMAIN GATSBY_FIREBASE_PROJECT_ID GATSBY_FIREBASE_APP_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::$v is empty — add it under Settings → Secrets and variables → Actions for this repository"
+              missing=1
+            fi
+          done
+          [ -z "${missing:-}" ]
         env:
+          GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}
+          GATSBY_FIREBASE_AUTH_DOMAIN: ${{ secrets.GATSBY_FIREBASE_AUTH_DOMAIN }}
+          GATSBY_FIREBASE_PROJECT_ID: ${{ secrets.GATSBY_FIREBASE_PROJECT_ID }}
+          GATSBY_FIREBASE_APP_ID: ${{ secrets.GATSBY_FIREBASE_APP_ID }}
+
+      - name: Build website
+        # GATSBY_CUSTOM_DOMAIN unset  -> github.io/<repo> hosting, assets prefixed
+        # GATSBY_CUSTOM_DOMAIN set    -> custom-domain hosting at the root + CNAME
+        run: |
+          if [ -n "$GATSBY_CUSTOM_DOMAIN" ]; then
+            yarn workspace lyf-registration-website run build
+            echo "$GATSBY_CUSTOM_DOMAIN" > website/public/CNAME
+          else
+            yarn workspace lyf-registration-website run build --prefix-paths
+          fi
+        env:
+          GATSBY_CUSTOM_DOMAIN: ${{ vars.GATSBY_CUSTOM_DOMAIN }}
           GATSBY_FIRESTORE_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_DATABASE_ID || 'lyf-v2' }}
           GATSBY_FIRESTORE_TEST_DATABASE_ID: ${{ vars.GATSBY_FIRESTORE_TEST_DATABASE_ID || 'lyf-v2-test' }}
           GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}

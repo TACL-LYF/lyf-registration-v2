@@ -167,12 +167,15 @@ function handleStripeWebhookHelper(
   };
 }
 
+// Stripe calls these anonymously; authenticity is the signature check inside.
+const webhookOptions = {cors: false, invoker: "public" as const};
+
 export const handleStripeWebhook = onRequest(
-  {cors: false},
+  webhookOptions,
   handleStripeWebhookHelper(true /* isProd */)
 );
 
 export const handleTestStripeWebhook = onRequest(
-  {cors: false},
+  webhookOptions,
   handleStripeWebhookHelper(false /* isProd */)
 );
