@@ -5,7 +5,8 @@ import pluginReact from "eslint-plugin-react";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
-  { ignores: ["lib/"] },
+  // lib/ is tsc output; isolate/ is the deploy bundle isolate-package generates
+  { ignores: ["lib/", "isolate/"] },
   { files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"], plugins: { js }, extends: ["js/recommended"], languageOptions: { globals: globals.browser } },
   tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,

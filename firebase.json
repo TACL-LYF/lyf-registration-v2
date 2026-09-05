@@ -13,7 +13,7 @@
   ],
   "functions": [
     {
-      "source": "functions",
+      "source": "functions/isolate",
       "codebase": "v2",
       "ignore": [
         "node_modules",
@@ -22,8 +22,11 @@
         "firebase-debug.*.log"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run lint",
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "yarn workspace lyf-registration-schemas build",
+        "yarn --cwd functions run lint",
+        "yarn --cwd functions run build",
+        "yarn --cwd functions run isolate",
+        "cp functions/.env functions/isolate/.env"
       ],
       "runtime": "nodejs22"
     }

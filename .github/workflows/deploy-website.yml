@@ -33,6 +33,23 @@ jobs:
           yarn workspace lyf-registration-schemas build
           yarn workspace small-group-pairing build
 
+      # Secrets are not inherited by forks; an empty API key builds fine but the
+      # deployed app crashes on load with auth/invalid-api-key. Fail here instead.
+      - name: Check Firebase config is present
+        run: |
+          for v in GATSBY_FIREBASE_API_KEY GATSBY_FIREBASE_AUTH_DOMAIN GATSBY_FIREBASE_PROJECT_ID GATSBY_FIREBASE_APP_ID; do
+            if [ -z "${!v}" ]; then
+              echo "::error::$v is empty — add it under Settings → Secrets and variables → Actions for this repository"
+              missing=1
+            fi
+          done
+          [ -z "${missing:-}" ]
+        env:
+          GATSBY_FIREBASE_API_KEY: ${{ secrets.GATSBY_FIREBASE_API_KEY }}
+          GATSBY_FIREBASE_AUTH_DOMAIN: ${{ secrets.GATSBY_FIREBASE_AUTH_DOMAIN }}
+          GATSBY_FIREBASE_PROJECT_ID: ${{ secrets.GATSBY_FIREBASE_PROJECT_ID }}
+          GATSBY_FIREBASE_APP_ID: ${{ secrets.GATSBY_FIREBASE_APP_ID }}
+
       - name: Build website
         # GATSBY_CUSTOM_DOMAIN unset  -> github.io/<repo> hosting, assets prefixed
         # GATSBY_CUSTOM_DOMAIN set    -> custom-domain hosting at the root + CNAME

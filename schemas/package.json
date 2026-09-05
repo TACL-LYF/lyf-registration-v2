@@ -4,6 +4,9 @@
     "main": "dist/index",
     "types": "dist/index",
     "private": true,
+    "files": [
+        "dist"
+    ],
     "scripts": {
         "build": "tsc"
     },
