@@ -24,6 +24,7 @@ import {
   assertAdmin,
   callableOptions,
 } from "../utils/auth";
+import {withSentryCallable} from "../utils/sentry";
 import mjml2html from "mjml";
 
 // Ensure that all variables wrapped in {{}} are represented here
@@ -50,7 +51,7 @@ const htmlTemplate = mjml2html(mjmlTemplate, {
  */
 export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
   callableOptions,
-  async (request) => {
+  withSentryCallable("moveCampersOffWaitlist", async (request) => {
     await assertAdmin(request, "manageWaitlist");
 
     const {
@@ -110,5 +111,5 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
       ),
       html: htmlBody,
     });
-  }
+  })
 );

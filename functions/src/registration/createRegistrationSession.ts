@@ -22,6 +22,7 @@ import {
   validateDollarAmount,
   validateRedirectUrl,
 } from "../utils/auth";
+import {withSentryCallable} from "../utils/sentry";
 
 // Import schema
 import {
@@ -44,7 +45,7 @@ export interface RegistrationLineItemMetadata extends Stripe.Metadata {
 
 export const createRegistrationSession = onCall<RegistrationPayload>(
   callableOptions,
-  async (request) => {
+  withSentryCallable("createRegistrationSession", async (request) => {
     if (!request.auth) {
       throw new HttpsError("unauthenticated", "Not signed in");
     }
@@ -313,5 +314,5 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
         message: "Failed to create a Stripe Checkout session",
       };
     }
-  }
+  })
 );

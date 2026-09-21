@@ -11,6 +11,7 @@ import {
 
 import {db} from "../utils";
 import {assertAdmin, callableOptions} from "../utils/auth";
+import {withSentryCallable} from "../utils/sentry";
 
 /**
  * The only write path for the admin roster. Firestore rules deny client
@@ -24,7 +25,7 @@ import {assertAdmin, callableOptions} from "../utils/auth";
  */
 export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminResponse>>(
   callableOptions,
-  async (request) => {
+  withSentryCallable("manageAdmin", async (request) => {
     const {email: actorEmail} = await assertAdmin(request, "manageAdmins");
     const actor = normalizeEmail(actorEmail);
 
@@ -149,5 +150,5 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
 
     logger.info(`manageAdmin: ${actor} ${action} ${target}`);
     return {status: "success", action, email: target};
-  }
+  })
 );

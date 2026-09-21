@@ -9,6 +9,7 @@ import {
 import {Camper, Family, normalizeEmails} from "lyf-registration-schemas";
 
 import {PROD_DATABASE_ID, TEST_DATABASE_ID} from "../utils";
+import {withSentryEvent} from "../utils/sentry";
 
 // Firestore batches cap at 500 writes
 const BATCH_SIZE = 400;
@@ -61,10 +62,14 @@ async function syncFamilyEmails(
 
 export const syncFamilyEmailsOnUpdate = onDocumentUpdated(
   {document: "families/{familyId}", database: PROD_DATABASE_ID},
-  (event) => syncFamilyEmails(PROD_DATABASE_ID, event)
+  withSentryEvent("syncFamilyEmailsOnUpdate", (event) =>
+    syncFamilyEmails(PROD_DATABASE_ID, event)
+  )
 );
 
 export const syncFamilyEmailsOnUpdateTest = onDocumentUpdated(
   {document: "families/{familyId}", database: TEST_DATABASE_ID},
-  (event) => syncFamilyEmails(TEST_DATABASE_ID, event)
+  withSentryEvent("syncFamilyEmailsOnUpdateTest", (event) =>
+    syncFamilyEmails(TEST_DATABASE_ID, event)
+  )
 );
