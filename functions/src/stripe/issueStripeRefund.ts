@@ -7,7 +7,7 @@ import {getStripe} from "../utils";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
 import {
   assertAdmin,
-  callableOptions,
+  adminCallableOptions,
   validateDollarAmount,
 } from "../utils/auth";
 import {withSentryCallable} from "../utils/sentry";
@@ -26,11 +26,18 @@ type IssueStripeRefundRequest = {
  * @returns Code 200 if successful, 402 if any error occurs
  */
 export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
-  callableOptions,
+  adminCallableOptions,
   withSentryCallable("issueStripeRefund", async (request) => {
     await assertAdmin(request, "managePayments");
 
-    const {stripeId, amount} = request.data;
+    // Not routed through a schemas validator (no document is written), so the
+    // three fields are checked by hand. A missing body must not become an
+    // "internal" error, and the test-data switch is honoured only when it is
+    // literally true.
+    const data = (request.data ?? {}) as Partial<IssueStripeRefundRequest>;
+    const {stripeId} = data;
+    const amount = data.amount as number;
+    const isTestData = data.isTestData === true;
     validateDollarAmount(amount, "amount", 100_000_00);
 
     if (
@@ -44,7 +51,7 @@ export const issueStripeRefund = onCall<IssueStripeRefundRequest>(
     }
 
     try {
-      const stripe = getStripe(!request.data.isTestData);
+      const stripe = getStripe(!isTestData);
       let paymentIntent = null;
       if (stripeId.startsWith("pi_")) {
         paymentIntent = stripeId;

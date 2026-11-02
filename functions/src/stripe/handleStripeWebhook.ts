@@ -19,6 +19,7 @@ import {
   getStripe,
 } from "../utils";
 import {fulfillRegistration} from "../registration/fullfillRegistration";
+import {releaseRegistrationHolds} from "../registration/releaseRegistrationHolds";
 import {fulfillPreRegistrations} from "../preRegistration/fulfillPreRegistrations";
 import {
   sendMessageToRegistrationErrorMessages,
@@ -39,7 +40,21 @@ function handleStripeWebhookHelper(
   const stripe = getStripe(isProd);
 
   return async (request, response) => {
-    const sig = request.headers["stripe-signature"] as string;
+    // Stripe only ever POSTs signed events. Browsers and crawlers that open
+    // the function URL send a GET with no body, which used to reach the
+    // signature check and get reported to Sentry as an invalid event.
+    if (request.method !== "POST") {
+      response.set("Allow", "POST").status(405).send();
+      return;
+    }
+
+    const sig = request.headers["stripe-signature"];
+    if (typeof sig !== "string" || !request.rawBody) {
+      logger.warn("Stripe webhook request without a signature or body");
+      response.status(400).send();
+      return;
+    }
+
     let event: Stripe.Event;
     try {
       event = stripe.webhooks.constructEvent(
@@ -84,8 +99,10 @@ function handleStripeWebhookHelper(
       switch (event.type) {
         case "checkout.session.completed":
         case "checkout.session.async_payment_succeeded": {
-          logger.info("Handling a checkout session");
           const session = event.data.object as Stripe.Checkout.Session;
+          logger.info(
+            `Handling ${event.type} for session ${session.id} (event ${event.id})`
+          );
           const sessionWithLineItems = await stripe.checkout.sessions.retrieve(
             session.id,
             {
@@ -144,13 +161,46 @@ function handleStripeWebhookHelper(
           }
           break;
         }
+        case "checkout.session.expired": {
+          // Registration sessions hold camp spots (see createOrUpdateRegistration);
+          // when the session lapses unpaid, hand them back.
+          const session = event.data.object as Stripe.Checkout.Session;
+          logger.info(
+            `Handling expired session ${session.id} (event ${event.id})`
+          );
+          const sessionWithLineItems = await stripe.checkout.sessions.retrieve(
+            session.id,
+            {expand: ["line_items.data.price.product"]}
+          );
+
+          if (sessionWithLineItems.metadata?.app !== STRIPE_APP_TAG) {
+            logger.info(
+              `Ignoring expired session ${session.id}: not created by this app ` +
+                `(app=${sessionWithLineItems.metadata?.app ?? "none"})`
+            );
+            break;
+          }
+
+          const eventType = sessionWithLineItems.metadata?.eventType ?? "-1";
+          if (parseInt(eventType) === StripeWebhookEventType.Registration) {
+            await releaseRegistrationHolds(db, sessionWithLineItems);
+          } else {
+            // Donation and pre-registration sessions hold nothing.
+            logger.info(
+              `Expired session ${session.id} (eventType=${eventType}) holds no spots`
+            );
+          }
+          break;
+        }
         default:
-          logger.error("Unhandled event type");
+          logger.error(`Unhandled event type ${event.type} (event ${event.id})`);
       }
     } catch (error) {
       Sentry.captureException(error);
-      logger.error("Failed to handle the event: ", error);
-      sendMessageToRegistrationErrorMessages("Failed to handle an event");
+      logger.error(`Failed to handle ${event.type} (event ${event.id})`, error);
+      sendMessageToRegistrationErrorMessages(
+        `Failed to handle Stripe event ${event.id} (${event.type}); see Sentry`
+      );
       // Release the claim so Stripe's retry can reprocess this event.
       await eventRef.delete().catch((e) => logger.error(e));
       response.status(500).send();

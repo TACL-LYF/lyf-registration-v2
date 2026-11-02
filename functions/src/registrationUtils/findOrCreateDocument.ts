@@ -13,45 +13,87 @@ import {
   Family,
   Parent,
   Registration,
+  isEstablishedFamilyMember,
+  normalizeEmail,
+  validateRegistrationWrite,
 } from "lyf-registration-schemas";
 
-type RefAndExisting<T> = {
+export type RefAndExisting<T> = {
   ref: DocumentReference<T>;
   didExist: boolean;
 };
 
 /**
- * Find the family associated with the authenticated caller's email,
- * or create a new family document if none exists.
+ * Find the family the authenticated caller belongs to, or create a new one.
  *
- * Uses only the verified auth email for lookup to prevent a user from
- * merging into another family by supplying a victim's email as a co-parent.
+ * Membership (`Family.emails`) is the only authorization key for family data
+ * in firestore.rules, and any parent can list any address as a co-parent. So
+ * being listed in a family is not, by itself, proof that the caller belongs
+ * there: otherwise anyone could pre-claim a stranger's email and have that
+ * person's campers, health info and registrations written into a family the
+ * claimant can read. The caller is registered into
+ *
+ *   1. the family they are an established member of (created it, confirmed
+ *      it before, or are its only member — see isEstablishedFamilyMember), or
+ *   2. failing that, the family they explicitly confirmed in this request
+ *      (`joinFamilyId`), provided they are actually listed in it, or
+ *   3. failing that, a brand-new family of their own.
+ *
+ * Only the verified auth email is used for the lookup, which also prevents
+ * the inverse: merging into a victim's family by naming them as a co-parent.
  *
  * @param db The Firestore database to query from.
  * @param authEmail The caller's verified email from Firebase Auth.
+ * @param joinFamilyId A family the caller confirmed as theirs, if any.
  */
 export async function findOrCreateFamily(
   db: Firestore,
-  authEmail: string
-): Promise<DocumentReference<Family>> {
-  const normalizedAuthEmail = authEmail.toLowerCase();
+  authEmail: string,
+  joinFamilyId?: string | null
+): Promise<RefAndExisting<Family>> {
+  const callerEmail = normalizeEmail(authEmail);
+
   const familiesQuery = await db
     .collection("families")
-    .where("emails", "array-contains", normalizedAuthEmail)
+    .where("emails", "array-contains", callerEmail)
     .get();
-  if (familiesQuery.size > 1) {
-    logger.error(
-      `More than one family found for auth email: ${normalizedAuthEmail}`
-    );
+
+  const ownFamilies = familiesQuery.docs.filter((familyDoc) =>
+    isEstablishedFamilyMember(familyDoc.data() as Family, callerEmail)
+  );
+
+  if (ownFamilies.length > 1) {
+    logger.error(`More than one family found for auth email: ${callerEmail}`);
     throw new HttpsError(
       "failed-precondition",
       "Multiple families found for your account. Please contact support."
     );
   }
 
-  return familiesQuery.size == 1
-    ? familiesQuery.docs[0].ref
-    : db.collection("families").doc();
+  if (ownFamilies.length === 1) {
+    return {ref: ownFamilies[0].ref, didExist: true};
+  }
+
+  if (joinFamilyId) {
+    const confirmed = familiesQuery.docs.find((d) => d.id === joinFamilyId);
+    if (!confirmed) {
+      throw new HttpsError(
+        "permission-denied",
+        "You are not listed as a parent on the family you selected"
+      );
+    }
+    logger.info(`${callerEmail} confirmed family ${joinFamilyId} as theirs`);
+    return {ref: confirmed.ref, didExist: true};
+  }
+
+  if (familiesQuery.size > 0) {
+    logger.info(
+      `${callerEmail} is listed in ${familiesQuery.size} family document(s) ` +
+        "but has not confirmed any of them; creating a new family"
+    );
+  }
+
+  return {ref: db.collection("families").doc(), didExist: false};
 }
 
 /**
@@ -68,7 +110,11 @@ export async function findOrCreateParent(
     logger.warn(`No email found with parent: ${parentName}`);
   }
 
-  const parentId = parent.email?.toLowerCase() ?? parent.phoneNumber;
+  // A blank email (allowed by the payload validator for a parent reached by
+  // phone) counts as no email, so the phone number keys the document.
+  const parentId = parent.email ?
+    normalizeEmail(parent.email) :
+    parent.phoneNumber;
 
   if (!parentId) {
     const errMsg = `No email or phone number found on the parent ${parentName}`;
@@ -106,42 +152,78 @@ export async function findOrCreateCamper(
     : campersInFamilyRef.doc();
 }
 
+// gRPC status code returned by DocumentReference.create() when the doc exists
+const GRPC_ALREADY_EXISTS = 6;
+
 /**
- * Find or create a new registration for the camper and camp year
+ * Find or create the registration for the camper and camp year.
+ *
+ * Registrations are keyed by the camper id (camps/{year}/registrations/{camperId},
+ * schemaVersion 3) so a camper can never end up with two registrations for
+ * one camp, however many times the form is submitted concurrently. Resolution
+ * order:
+ *   1. a ref already in the camper's `registrations` array for this camp
+ *      (pre-schemaVersion-3 registrations have random ids and must keep working),
+ *   2. the deterministic document, if it exists,
+ *   3. otherwise create the deterministic document with create(), which fails
+ *      if it already exists; a concurrent duplicate request that loses that
+ *      race simply picks up the document the winner created.
  * @param camperRef The camper this registration is associated with
- * @param campRef The document referencing the curren't camp year
+ * @param campRef The document referencing the current camp year
  * @returns The registration document reference
  */
 export async function findOrCreateRegistration(
   camperRef: DocumentReference<Camper>,
   campRef: DocumentReference<CampYear>
 ): Promise<RefAndExisting<Registration>> {
-  const camperData = (await camperRef.get()).data() as Camper;
+  const camperData = (await camperRef.get()).data() as Camper | undefined;
 
   // Each registration's parent is a collection and the collection's parent is a document whose ID is the camp year
-  const regRef = camperData?.registrations?.find(
+  const legacyRef = camperData?.registrations?.find(
     (regRef) => regRef.parent.parent?.id === campRef.id
   ) as DocumentReference<Registration> | undefined;
 
-  if (regRef) {
+  if (legacyRef) {
+    return {
+      ref: legacyRef,
+      didExist: true,
+    };
+  }
+
+  const regRef = campRef
+    .collection("registrations")
+    .doc(camperRef.id) as DocumentReference<Registration>;
+
+  if ((await regRef.get()).exists) {
     return {
       ref: regRef,
       didExist: true,
     };
   }
 
-  const newRegRef = campRef
-    .collection("registrations")
-    .doc() as DocumentReference<Registration>;
-
-  await newRegRef.set({
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp(),
-    isTestData: camperData.isTestData ?? false,
-  });
+  try {
+    await regRef.create(
+      validateRegistrationWrite({
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        isTestData: camperData?.isTestData ?? false,
+      })
+    );
+  } catch (err) {
+    if ((err as {code?: number}).code === GRPC_ALREADY_EXISTS) {
+      logger.info(
+        `Registration ${regRef.path} was created concurrently; reusing it`
+      );
+      return {
+        ref: regRef,
+        didExist: true,
+      };
+    }
+    throw err;
+  }
 
   return {
-    ref: newRegRef,
+    ref: regRef,
     didExist: false,
   };
 }

@@ -19,7 +19,9 @@ const allRegistrationStatuses = Object.values(RegistrationStatus)
 
 const countStatus = (data: RegistrationData[]) => {
   const countDict = new Map()
-  data.forEach(({status}) => countDict.set(status, (countDict.get(status) ?? 0) + 1))
+  data.forEach(({ status }) =>
+    countDict.set(status, (countDict.get(status) ?? 0) + 1)
+  )
 
   return countDict
 }
@@ -37,7 +39,21 @@ export default function useFilterRegistrationStatus(
     )
   }
 
-  const countDict: Map<RegistrationStatus, number> = countStatus(data)
+  // Both derive from the loaded registrations and the chosen statuses only;
+  // memoised so the grids built from `filtered` keep a stable input across
+  // unrelated re-renders (dialog state, row selection).
+  const countDict: Map<RegistrationStatus, number> = React.useMemo(
+    () => countStatus(data),
+    [data]
+  )
+  const filtered = React.useMemo(
+    () => data.filter((reg) => statuses.includes(reg.status)),
+    [data, statuses]
+  )
+  // Statuses with no registrations are absent from the map; show 0, not
+  // "undefined".
+  const labelFor = (status: string) =>
+    `${status} (${countDict.get(status as RegistrationStatus) ?? 0})`
 
   const selectComponent = (
     <FormControl fullWidth>
@@ -59,7 +75,7 @@ export default function useFilterRegistrationStatus(
         renderValue={(selected) => (
           <Box sx={{ display: "flex", flexWrap: "wrap", gap: 0.5 }}>
             {selected.map((value) => (
-              <Chip key={value} label={`${value} (${countDict.get(value as RegistrationStatus)})`} />
+              <Chip key={value} label={labelFor(value)} />
             ))}
           </Box>
         )}
@@ -67,12 +83,12 @@ export default function useFilterRegistrationStatus(
         {allRegistrationStatuses.map((status) => (
           <MenuItem key={status} value={status}>
             <Checkbox checked={statuses.includes(status)} />
-            <ListItemText primary={`${status} (${countDict.get(status)})`} />
+            <ListItemText primary={labelFor(status)} />
           </MenuItem>
         ))}
       </Select>
     </FormControl>
   )
 
-  return [data.filter((reg) => statuses.includes(reg.status)), selectComponent]
+  return [filtered, selectComponent]
 }

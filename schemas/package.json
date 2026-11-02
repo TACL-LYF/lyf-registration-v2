@@ -2,19 +2,26 @@
     "name": "lyf-registration-schemas",
     "version": "1.0.0",
     "main": "dist/index",
+    "module": "dist/esm/index.js",
     "types": "dist/index",
+    "sideEffects": false,
     "private": true,
     "files": [
         "dist"
     ],
     "scripts": {
-        "build": "tsc"
+        "build": "tsc && tsc -p tsconfig.esm.json",
+        "test": "jest"
     },
     "dependencies": {
         "cross-env": "^7.0.3",
-        "firebase": "^10.6.0"
+        "firebase": "^10.6.0",
+        "zod": "^4.6.7"
     },
     "devDependencies": {
+        "@types/jest": "^29.5.14",
+        "jest": "^29.7.0",
+        "ts-jest": "^29.2.5",
         "typescript": "~5.8.3"
     }
 }

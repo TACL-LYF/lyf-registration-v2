@@ -13,28 +13,42 @@ import {
   sendMessageToRegistrationErrorMessages,
   sendMessageToRegistrationForCampChannel,
 } from "../slack/slackChannelWebhooks";
-import {createDiscountName, getStripeCustomerId} from "../registrationUtils";
+import {
+  assertRegistrationOpen,
+  computeRegistrationCharges,
+  createDiscountName,
+  DEFAULT_SIBLING_DISCOUNT,
+  getStripeCustomerId,
+} from "../registrationUtils";
 import {createRegistrationDonationSession} from "../donation/createDonationSession";
 import {createOrUpdateRegistration} from "./createOrUpdateRegistration";
 import {
   callableOptions,
+  resolveForceWaitlistFlag,
   resolveTestDataFlag,
   validateDollarAmount,
   validateRedirectUrl,
 } from "../utils/auth";
 import {withSentryCallable} from "../utils/sentry";
+import {parseCallablePayload} from "../utils/validate";
 
 // Import schema
 import {
-  CampTrack,
   CampYear,
   getRegistrationPrice,
+  normalizeEmail,
   RegistrationPayload,
   RegistrationStatus,
+  validateRegistrationPayload,
+  validateRegistrationWrite,
 } from "lyf-registration-schemas";
 import {sendWaitlistEmail} from "../registrationUtils/sendWaitlistEmail";
 import {completeRegistration} from "./fullfillRegistration";
 import {FieldValue} from "firebase-admin/firestore";
+
+// How long a registration checkout session stays payable before Stripe
+// expires it and the webhook releases the held spots. Stripe's minimum is 30.
+export const REGISTRATION_CHECKOUT_EXPIRY_MINUTES = 45;
 
 export interface RegistrationLineItemMetadata extends Stripe.Metadata {
   familyRef: string;
@@ -50,6 +64,14 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
       throw new HttpsError("unauthenticated", "Not signed in");
     }
 
+    // Shape, bounds and enums are checked here; the allow-listed redirect
+    // origins and the donation cap below are policy the validator leaves to us.
+    // `payload` (not request.data) is used from here on: the validator strips
+    // the Firestore leftovers the website spreads into family/parents/campers.
+    const payload = parseCallablePayload(
+      validateRegistrationPayload,
+      request.data
+    );
     const {
       campYear,
       parents,
@@ -58,8 +80,8 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
       successUrl,
       cancelUrl,
       isTestData: requestedTestData = false,
-      forceWaitlist = false,
-    } = request.data;
+      forceWaitlist: requestedForceWaitlist = false,
+    } = payload;
 
     validateRedirectUrl(successUrl);
     validateRedirectUrl(cancelUrl);
@@ -68,33 +90,70 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
     }
 
     const isTestData = await resolveTestDataFlag(request, requestedTestData);
+    const forceWaitlist = await resolveForceWaitlistFlag(
+      request,
+      requestedForceWaitlist
+    );
     const db = getFirestoreDb(!isTestData);
 
-    // Get the registration pricing.
+    // Get the registration pricing. campYear comes from the client, so refuse
+    // anything that does not resolve to a camp with a real price: a missing or
+    // unpriced camp document would otherwise yield a $0 registration that is
+    // treated as fully covered and activated without payment.
     const campRef = db.collection("camps").doc(campYear.toString());
-    const campData = (await campRef.get()).data() as CampYear;
+    const campSnapshot = await campRef.get();
+    if (!campSnapshot.exists) {
+      throw new HttpsError(
+        "failed-precondition",
+        `Registration is not open for camp year ${campYear}`
+      );
+    }
+    const campData = campSnapshot.data() as CampYear;
     const campPrice = getRegistrationPrice(campData);
-    const campPreRegistrationFee = campData?.preRegistrationFee ?? 500;
-    const siblingDiscount = campData?.siblingDiscount ?? 80;
-    const remainingSpots = campData?.remainingSpots ?? {
-      [CampTrack.YOUNGER]: 0,
-      [CampTrack.OLDER]: 0,
-    };
+    if (!Number.isFinite(campPrice) || campPrice <= 0) {
+      logger.error(
+        `Camp ${campYear} has no registration fee configured; refusing to register`
+      );
+      throw new HttpsError(
+        "failed-precondition",
+        `Registration pricing is not configured for camp year ${campYear}`
+      );
+    }
+    // The website hides the registration page after registrationCloseDate,
+    // but this callable is reachable directly, so enforce the same window
+    // (and the per-family bypass list) here before anything is written.
+    await assertRegistrationOpen(
+      db,
+      campYear,
+      campData,
+      request.auth.token.email!
+    );
 
-    // Update the family, parent, camper, and registration info accordingly
+    const campPreRegistrationFee = campData?.preRegistrationFee ?? 500;
+    const siblingDiscount =
+      campData?.siblingDiscount ?? DEFAULT_SIBLING_DISCOUNT;
+
+    // Update the family, parent, camper, and registration info accordingly.
+    // Capacity is read and reserved inside createOrUpdateRegistration's
+    // transaction, not from the (possibly stale) camp snapshot above.
     const {familyRef, parentRefs, camperAndStatuses} =
       await createOrUpdateRegistration(
         db,
-        request.data,
-        remainingSpots,
+        payload,
         forceWaitlist,
         request.auth.token.email!
       );
 
-    // Assume the first parent is the signed in parent.
-    const signedInParentRef = parentRefs[0];
-    const signedInParentEmail =
-      request.auth.token.email ?? (parents[0].email?.toLowerCase() as string);
+    // The Stripe customer is created for, and stored on, the signed-in
+    // parent's document, so find that parent by the verified auth email
+    // rather than assuming they were listed first. assertCallerEmailInList
+    // (in createOrUpdateRegistration) guarantees a match exists.
+    const signedInParentEmail = normalizeEmail(request.auth.token.email!);
+    const signedInParentIndex = parents.findIndex(
+      (p) => !!p.email && normalizeEmail(p.email) === signedInParentEmail
+    );
+    const signedInParentRef =
+      parentRefs[signedInParentIndex >= 0 ? signedInParentIndex : 0];
 
     const waitlistedCampers = camperAndStatuses.filter(
       ({isWaitlisted}) => isWaitlisted
@@ -115,6 +174,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
 
         // TODO: Replace this with an individualized waitlist email once we have that ready.
         await sendWaitlistEmail(
+          db,
           signedInParentEmail,
           campYear,
           campTrack,
@@ -147,7 +207,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
       );
     }
 
-    let totalRegistrationCost = 0;
+    let registeredCost = 0;
     const stripeLineItems: LineItem<RegistrationLineItemMetadata>[] = [];
 
     // Create Stripe line items for the registrations.
@@ -159,7 +219,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
           const registrationCost =
             campPrice - (isPreRegistered ? campPreRegistrationFee : 0);
 
-          totalRegistrationCost += registrationCost;
+          registeredCost += registrationCost;
           stripeLineItems.push({
             priceInDollars: registrationCost,
             name: `LYF Camp ${campYear} Registration${
@@ -178,25 +238,32 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
     );
 
     // We don't trust any discounts applied from the client-side, so re-compute them here.
-    const siblingDiscountAmount = siblingDiscount * (campers.length - 1);
-    totalRegistrationCost -= siblingDiscountAmount;
-
-    // Apply any camp credit that the family has.
+    // The discount is per *paid* sibling: waitlisted campers are not charged, so
+    // they must not count, or a request padded with waitlisted campers could
+    // discount the paid ones down to nothing (see computeRegistrationCharges).
     const campCredit = await db.collection("credits").doc(familyRef.id).get();
-    const campCreditRemaining = campCredit.data()?.amountRemaining ?? 0;
-    const campCreditUsed = Math.min(totalRegistrationCost, campCreditRemaining);
+    const {siblingDiscountAmount, campCreditUsed, isFullyCovered} =
+      computeRegistrationCharges({
+        registeredCost,
+        registeredCount: registeredCampers.length,
+        siblingDiscount,
+        campCreditRemaining: campCredit.data()?.amountRemaining ?? 0,
+      });
 
     // At this point, if they have more camp credit than the total registration cost
     // (i.e. financial aid), then we just need to immediately return or create a donation session
-    if (totalRegistrationCost <= campCreditUsed) {
-      // Complete the registrations
+    if (isFullyCovered) {
+      // Complete the registrations. Only the campers who have a spot become
+      // active; waitlisted campers in the same request stay on the waitlist.
       const campTrackSpots = new Map<string, number>();
       await Promise.all(
-        camperAndStatuses.map(async (c) => {
-          await c.registrationRef.update({
-            status: RegistrationStatus.ACTIVE,
-            updatedAt: FieldValue.serverTimestamp(),
-          });
+        registeredCampers.map(async (c) => {
+          await c.registrationRef.update(
+            validateRegistrationWrite({
+              status: RegistrationStatus.ACTIVE,
+              updatedAt: FieldValue.serverTimestamp(),
+            })
+          );
 
           campTrackSpots.set(
             c.campTrack,
@@ -211,7 +278,7 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
         campYear.toString(),
         signedInParentEmail,
         familyRef,
-        camperAndStatuses.map((c) => c.registrationRef),
+        registeredCampers.map((c) => c.registrationRef),
         stripeLineItems.map((s) => s.name),
         campCreditUsed,
         campTrackSpots
@@ -294,7 +361,10 @@ export const createRegistrationSession = onCall<RegistrationPayload>(
         StripeWebhookEventType.Registration,
         paymentDescription,
         isTestData,
-        discount
+        discount,
+        // The session holds camp spots (spotReserved); keep the hold short and
+        // let checkout.session.expired hand the spots back.
+        {expiresAfterMinutes: REGISTRATION_CHECKOUT_EXPIRY_MINUTES}
       );
       return {
         status: "success",

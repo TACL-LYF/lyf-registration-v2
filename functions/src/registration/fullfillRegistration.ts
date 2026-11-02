@@ -15,9 +15,18 @@ import {
   Payment,
   Registration,
   RegistrationStatus,
+  validateCampCreditWrite,
+  validateCampYearWrite,
+  validatePaymentWrite,
+  validateRegistrationWrite,
 } from "lyf-registration-schemas";
 import {RegistrationLineItemMetadata} from "./createRegistrationSession";
-import {createDiscountName} from "../registrationUtils";
+import {
+  applySpotDelta,
+  createDiscountName,
+  DEFAULT_SIBLING_DISCOUNT,
+  RemainingSpotsMap,
+} from "../registrationUtils";
 import {
   sendMessageToRegistrationForCampChannel,
   sendMessageToRegistrationErrorMessages,
@@ -26,6 +35,11 @@ import {addParentsToMailchimpList} from "../utils/mailchimp";
 import {RegistrationType} from "../utils";
 import {getRegistrationAndCamperInfo} from "../registrationUtils/getRegistrationAndCamperInfo";
 import {sendRegistrationEmail} from "../registrationUtils/sendRegistrationEmail";
+import {
+  isRegistrationLineItem,
+  lineItemMetadata,
+  splitLineItems,
+} from "../stripe/lineItems";
 
 /**
  * Small helper to calculate the discounts used while early-returning if we don't need to get the firestore object
@@ -44,10 +58,18 @@ async function calculateDiscountAmounts(
   if (discountAmount <= 0) return [0, 0];
 
   const campYearInfo = (await campYearRef.get()).data();
-  const siblingDiscount = campYearInfo?.siblingDiscount ?? 0;
+  // Same default as createRegistrationSession, otherwise a camp year without
+  // the field would have the whole coupon attributed to camp credit here.
+  const siblingDiscount =
+    campYearInfo?.siblingDiscount ?? DEFAULT_SIBLING_DISCOUNT;
 
-  const siblingDiscountUsed = (numberOfRegistrations - 1) * siblingDiscount;
-  const campCreditUsed = discountAmount - siblingDiscountUsed;
+  // Mirrors createRegistrationSession: the sibling discount is per paid
+  // registration and can never exceed the discount Stripe actually applied.
+  const siblingDiscountUsed = Math.min(
+    Math.max(0, numberOfRegistrations - 1) * siblingDiscount,
+    discountAmount
+  );
+  const campCreditUsed = Math.max(0, discountAmount - siblingDiscountUsed);
 
   return [siblingDiscountUsed, campCreditUsed];
 }
@@ -57,7 +79,7 @@ async function calculateDiscountAmounts(
  * 1. Sending confirmation emails for each of the registered campers
  * 2. Sending messages to the registration channel for each camper
  * 3. Adding the parents to the mailchimp list
- * 4. Updating the remaining spots
+ * 4. Updating the remaining spots for registrations that don't already hold one
  * 5. Subtracting camp credit if it was used
  *
  * @param db
@@ -68,7 +90,8 @@ async function calculateDiscountAmounts(
  * @param registrationRefs
  * @param registrationDescriptions
  * @param campCreditUsed
- * @param campTrackSpots
+ * @param campTrackSpots Tracks being registered for (used for the mailing
+ *   list); the spot decrement itself is derived from the registration docs.
  */
 export async function completeRegistration(
   db: Firestore,
@@ -99,6 +122,7 @@ export async function completeRegistration(
       logger.info(`Sending confirmation email to ${email}`);
       try {
         await sendRegistrationEmail(
+          db,
           email,
           Number.parseInt(campYear),
           camper,
@@ -134,35 +158,43 @@ export async function completeRegistration(
     "parents"
   );
   await addParentsToMailchimpList(
+    db,
     RegistrationType.Registration,
     parentCollectionRef,
     campYear,
-    Array.from(campTrackSpots.keys()) as CampTrack[]
+    Array.from(campTrackSpots.keys()) as CampTrack[],
+    isTestData
   );
 
-  // Update the remaining spots
-  if (campTrackSpots.size > 0) {
+  // Update the remaining spots. A registration that already holds a spot
+  // (reserved in the registration transaction or by moveCampersOffWaitlist)
+  // must not be counted twice, so only decrement for the ones whose
+  // `spotReserved` is not set, and mark them reserved in the same transaction.
+  if (registrationRefs.length > 0) {
     const campYearRef = db.collection("camps").doc(campYear);
     await db.runTransaction(async (t) => {
       const campYearDoc = await t.get(campYearRef);
+      const registrationDocs = await t.getAll(...registrationRefs);
+
+      const toReserve = registrationDocs.filter(
+        (doc) => doc.exists && doc.data()?.spotReserved !== true
+      );
+      if (toReserve.length === 0) return;
+
       const campYear = campYearDoc.data() as CampYear;
+      let remainingSpots: RemainingSpotsMap | undefined =
+        campYear?.remainingSpots;
+      toReserve.forEach((doc) => {
+        const track = doc.data()?.campTrack;
+        if (track && remainingSpots) {
+          remainingSpots = applySpotDelta(remainingSpots, track, -1);
+        }
+        t.update(doc.ref, validateRegistrationWrite({spotReserved: true}));
+      });
 
-      const remainingSpots = campYear?.remainingSpots;
-      // No camp year data found so just early return
+      // No camp year capacity data found so just flag the registrations
       if (!remainingSpots) return;
-
-      const newRemainingSpots = new Map<CampTrack, number>();
-      Object.entries(remainingSpots).forEach(([campTrack, spots]) => {
-        const spotsToSubtract = campTrackSpots.get(campTrack as CampTrack) ?? 0;
-        newRemainingSpots.set(
-          campTrack as CampTrack,
-          Math.max(0, spots - spotsToSubtract)
-        );
-      });
-
-      t.update(campYearRef, {
-        remainingSpots: Object.fromEntries(newRemainingSpots),
-      });
+      t.update(campYearRef, validateCampYearWrite({remainingSpots}));
     });
   }
 
@@ -174,12 +206,14 @@ export async function completeRegistration(
     await sendMessageToRegistrationForCampChannel(message);
 
     const creditRef = db.collection("credits").doc(familyId);
-    await creditRef.update({
-      amountRemaining: FieldValue.increment(-campCreditUsed),
-      notes: FieldValue.arrayUnion(
-        `-${campCreditUsed}: ${campYear} LYF Camp Registration`
-      ),
-    });
+    await creditRef.update(
+      validateCampCreditWrite({
+        amountRemaining: FieldValue.increment(-campCreditUsed),
+        notes: FieldValue.arrayUnion(
+          `-${campCreditUsed}: ${campYear} LYF Camp Registration`
+        ),
+      })
+    );
   }
 }
 
@@ -218,12 +252,24 @@ export async function fulfillRegistration(
     return;
   }
 
-  const donation = lineItems.data.find((item) =>
-    item.description.includes("Donation")
-  )?.amount_total;
-  const registrationLineItems = lineItems.data.filter((item) =>
-    item.description.includes("Registration")
+  // Classified by the metadata we stamped on each product, not by the product
+  // name: the name carries the camper's name, which the parent controls.
+  // The only item without registration metadata is the donation; a second
+  // one means the products lost their metadata (see splitLineItems).
+  const {ours: registrationLineItems, others} = splitLineItems(
+    lineItems.data,
+    isRegistrationLineItem
   );
+  if (others.length > 1) {
+    logger.error(
+      `${others.length} line items without registration metadata on ${sessionMessage}`
+    );
+    sendMessageToRegistrationErrorMessages(
+      `${others.length} line items without registration metadata on ${sessionMessage}`
+    );
+    return;
+  }
+  const donation = others[0]?.amount_total;
   const paymentIntent = checkoutSession.payment_intent as Stripe.PaymentIntent;
   const paymentMethod = (paymentIntent.payment_method as Stripe.PaymentMethod)
     .type;
@@ -238,14 +284,8 @@ export async function fulfillRegistration(
   const campTrackSpotsToSubtract = new Map<string, number>();
   await Promise.all(
     registrationLineItems.map(async (item) => {
-      const product = item.price?.product as Stripe.Product;
-      const metadata = product?.metadata as RegistrationLineItemMetadata;
-
-      if (!metadata) {
-        logger.error("No metadata found on line item: ", item);
-        return;
-      }
-
+      // Present: isRegistrationLineItem selected the item on this metadata.
+      const metadata = lineItemMetadata(item) as RegistrationLineItemMetadata;
       logger.debug("Processing registration line item metadata", metadata);
 
       const registrationRef = db.doc(metadata.registrationRef);
@@ -288,7 +328,7 @@ export async function fulfillRegistration(
     .collection("payments")
     .doc(checkoutSession.id);
   await paymentRef.set(
-    {
+    validatePaymentWrite({
       customerEmail: customerEmail,
       customerName: checkoutSession.customer_details?.name ?? "",
       customerId: (checkoutSession.customer as string) ?? "",
@@ -316,7 +356,7 @@ export async function fulfillRegistration(
 
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    },
+    }),
     {
       merge: true,
     }
@@ -325,14 +365,16 @@ export async function fulfillRegistration(
   // Link the payment to the registration and update the status to active
   await Promise.all(
     registrationRefs.map(async (ref) => {
-      await ref.update({
-        payments: FieldValue.arrayUnion(paymentRef),
-        status:
-          checkoutSession.payment_status === "paid"
-            ? RegistrationStatus.ACTIVE
-            : RegistrationStatus.PROCESSING_PAYMENT,
-        updatedAt: FieldValue.serverTimestamp(),
-      });
+      await ref.update(
+        validateRegistrationWrite({
+          payments: FieldValue.arrayUnion(paymentRef),
+          status:
+            checkoutSession.payment_status === "paid"
+              ? RegistrationStatus.ACTIVE
+              : RegistrationStatus.PROCESSING_PAYMENT,
+          updatedAt: FieldValue.serverTimestamp(),
+        })
+      );
     })
   );
 

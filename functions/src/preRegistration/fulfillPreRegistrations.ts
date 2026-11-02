@@ -3,7 +3,15 @@ import {FieldValue, Firestore} from "firebase-admin/firestore";
 import {logger} from "firebase-functions";
 
 // Local imports
-import {RegistrationStatus} from "lyf-registration-schemas";
+import {
+  MAX_GRADE,
+  MIN_GRADE,
+  RegistrationStatus,
+  normalizeEmails,
+  validateCamperWrite,
+  validatePaymentWrite,
+  validateRegistrationWrite,
+} from "lyf-registration-schemas";
 import {PreRegistrationLineItemMetadata} from "./createPreRegistrationSession";
 import {
   sendMessageToRegistrationForCampChannel,
@@ -11,6 +19,11 @@ import {
 } from "../slack/slackChannelWebhooks";
 import {addParentsToMailchimpList} from "../utils/mailchimp";
 import {RegistrationType} from "../utils";
+import {
+  isPreRegistrationLineItem,
+  lineItemMetadata,
+  splitLineItems,
+} from "../stripe/lineItems";
 
 /**
  * Complete the Stripe webhook event that let us know a pre-registration succeeded.
@@ -40,12 +53,25 @@ export async function fulfillPreRegistrations(
     );
   }
 
-  const donation = lineItems.data.find((item) =>
-    item.description.includes("Donation")
-  )?.amount_total;
-  const lineItemsWithoutDonation = lineItems.data.filter(
-    (item) => !item.description.includes("Donation")
+  // Classified by the metadata we stamped on each product, not by the product
+  // name: the name carries the camper's name, which the parent controls.
+  // A donation-only session (no campers) is legitimate, but more than one
+  // unclassified item means the products lost their metadata, and treating
+  // them as the donation would record the payment with no pre-registration.
+  const {ours: lineItemsWithoutDonation, others} = splitLineItems(
+    lineItems.data,
+    isPreRegistrationLineItem
   );
+  if (others.length > 1) {
+    logger.error(
+      `${others.length} line items without pre-registration metadata on ${sessionMessage}`
+    );
+    sendMessageToRegistrationErrorMessages(
+      `${others.length} line items without pre-registration metadata on ${sessionMessage}`
+    );
+    return;
+  }
+  const donation = others[0]?.amount_total;
 
   // Add a payment to our Stripe database
   const paymentIntent = checkoutSession.payment_intent as Stripe.PaymentIntent;
@@ -54,11 +80,17 @@ export async function fulfillPreRegistrations(
 
   const paymentRef = db.collection("payments").doc(paymentIntent.id);
 
+  // Stripe types these as nullable; Payment stores strings, so fall back to
+  // "" the way fulfillRegistration does rather than writing null.
+  const customer = checkoutSession.customer;
+  const customerId =
+    typeof customer === "string" ? customer : (customer?.id ?? "");
+
   await paymentRef.set(
-    {
-      customerEmail: checkoutSession.customer_details?.email,
-      customerName: checkoutSession.customer_details?.name,
-      customerId: checkoutSession.customer,
+    validatePaymentWrite({
+      customerEmail: checkoutSession.customer_details?.email ?? "",
+      customerName: checkoutSession.customer_details?.name ?? "",
+      customerId,
       donation: (donation || 0) / 100,
       items: lineItemsWithoutDonation.map((item) => ({
         amount: item.amount_total / 100,
@@ -71,7 +103,7 @@ export async function fulfillPreRegistrations(
       status: checkoutSession.payment_status,
       createdAt: FieldValue.serverTimestamp(),
       updatedAt: FieldValue.serverTimestamp(),
-    },
+    }),
     {
       merge: true,
     }
@@ -80,17 +112,8 @@ export async function fulfillPreRegistrations(
   // Pre-Register the campers
   await Promise.all(
     lineItemsWithoutDonation.map(async (item, index) => {
-      const product = item.price?.product as Stripe.Product;
-      const metadata = product?.metadata as PreRegistrationLineItemMetadata;
-
-      if (!metadata) {
-        logger.error("No metadata found on line item: ", item);
-        sendMessageToRegistrationErrorMessages(
-          `No metadata found on line item with index ${index} on ${sessionMessage}`
-        );
-        return;
-      }
-
+      // Present: isPreRegistrationLineItem selected the item on this metadata.
+      const metadata = lineItemMetadata(item) as PreRegistrationLineItemMetadata;
       const {campYear, camperName, camperRefString, currentGradeString} =
         metadata;
 
@@ -110,23 +133,35 @@ export async function fulfillPreRegistrations(
         .doc(campYear)
         .collection("registrations");
       const camperRef = db.doc(camperRefString);
+      // Grade is "the grade the camper will complete", so next year's is one
+      // more. Only written when it is a real grade: the metadata is a string
+      // (possibly empty), and a grade past MAX_GRADE has nowhere to go.
       const nextYearGrade =
-        currentGradeString != "" ? parseInt(currentGradeString) + 1 : null;
+        currentGradeString != "" ? parseInt(currentGradeString) + 1 : NaN;
+      const hasNextYearGrade =
+        Number.isInteger(nextYearGrade) &&
+        nextYearGrade >= MIN_GRADE &&
+        nextYearGrade <= MAX_GRADE;
+      if (currentGradeString != "" && !hasNextYearGrade) {
+        logger.warn(
+          `Skipping grade for ${camperName}: "${currentGradeString}" + 1 is not a valid grade`
+        );
+      }
 
-      // Look up the family's emails for ownership-scoped Firestore rules
+      // Look up the family's emails for ownership-scoped Firestore rules.
+      // Family.emails are already normalized; normalize again so a legacy
+      // document cannot leak an un-normalized key onto the registration.
       const familyRef = camperRef.parent.parent;
       let familyEmails: string[] = [];
       if (familyRef) {
         const familyDoc = await familyRef.get();
-        familyEmails = (familyDoc.data()?.emails ?? []).map(
-          (e: string) => e.toLowerCase()
-        );
+        familyEmails = normalizeEmails(familyDoc.data()?.emails ?? []);
       }
 
       // Create a pre-registration for next year's camp.
       const preRegistrationRef = nextYearsCamp.doc(camperRef.id);
       await preRegistrationRef.set(
-        {
+        validateRegistrationWrite({
           // If the payment isn't completed yet, then mark the camper as pending payment.
           status: isPendingPayment
             ? RegistrationStatus.PENDING_PAYMENT
@@ -134,7 +169,7 @@ export async function fulfillPreRegistrations(
           amountPaid: FieldValue.increment(
             isPendingPayment ? 0 : item.amount_subtotal / 100
           ),
-          grade: nextYearGrade,
+          ...(hasNextYearGrade ? {grade: nextYearGrade} : {}),
           isPreRegistered: true,
           createdAt: FieldValue.serverTimestamp(),
           updatedAt: FieldValue.serverTimestamp(),
@@ -142,16 +177,18 @@ export async function fulfillPreRegistrations(
           camperName: camperName,
           payments: FieldValue.arrayUnion(paymentRef),
           familyEmails: familyEmails,
-        },
+        }),
         {
           merge: true,
         }
       );
 
       // Associate that pre-registration with the camper.
-      await camperRef.update({
-        registrations: FieldValue.arrayUnion(preRegistrationRef),
-      });
+      await camperRef.update(
+        validateCamperWrite({
+          registrations: FieldValue.arrayUnion(preRegistrationRef),
+        })
+      );
 
       // Send a message to our Slack channel
       await sendMessageToRegistrationForCampChannel(
@@ -170,9 +207,12 @@ export async function fulfillPreRegistrations(
         parentCollectionRef
       ) {
         await addParentsToMailchimpList(
+          db,
           RegistrationType.PreRegistration,
           parentCollectionRef,
-          campYear
+          campYear,
+          [],
+          isTestData
         );
       }
     })

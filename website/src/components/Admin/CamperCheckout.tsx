@@ -15,9 +15,10 @@ import { RegistrationStatus } from "lyf-registration-schemas"
 import { RowWithStatusAndNotes } from "./CancelStatusDialog"
 import useFilterRegistrationStatus from "@hooks/useFilterRegistrationStatus"
 
-type RegistrationDashboardProps = {
+type CamperCheckoutProps = {
   data: RegistrationData[]
   loading: boolean
+  campYear: number
 }
 
 export interface CamperCheckoutRow extends RowWithStatusAndNotes {
@@ -88,7 +89,7 @@ const columns: GridColDef[] = [
     headerName: "Checked Out At",
     type: "dateTime",
     width: 175,
-    // @ts-ignore I'm not sure what's the right type for GridColDef that includes nullable yet
+    // @ts-expect-error I'm not sure what's the right type for GridColDef that includes nullable yet
     nullable: true,
     ...DataGridColumnAlign,
   },
@@ -104,32 +105,41 @@ const columns: GridColDef[] = [
 export default function CamperCheckout({
   data,
   loading,
-}: RegistrationDashboardProps) {
+  campYear,
+}: CamperCheckoutProps) {
   const [filteredData] = useFilterRegistrationStatus(data, [
     RegistrationStatus.ACTIVE,
   ])
-  const registrationData = filteredData.sort((a, b) =>
-    a.camperName.localeCompare(b.camperName)
+  const registrationData = React.useMemo(
+    () =>
+      [...filteredData].sort((a, b) =>
+        a.camperName.localeCompare(b.camperName)
+      ),
+    [filteredData]
   )
 
-  const rows: CamperCheckoutRow[] = registrationData.map((reg, index) => ({
-    id: index.toString(),
-    index: index + 1,
-    name: reg.camperName,
-    status: reg.status,
+  const rows: CamperCheckoutRow[] = React.useMemo(
+    () =>
+      registrationData.map((reg, index) => ({
+        id: index.toString(),
+        index: index + 1,
+        name: reg.camperName,
+        status: reg.status,
 
-    // Join the parent's names if they exist.
-    parentNames: getParentNames(reg),
-    // Join the parent's emails if they exist.
-    parentEmails: getParentEmails(reg),
-    // Join the parent's phone numbers if they exist.
-    parentPhoneNumbers: getParentPhoneNumbers(reg),
+        // Join the parent's names if they exist.
+        parentNames: getParentNames(reg),
+        // Join the parent's emails if they exist.
+        parentEmails: getParentEmails(reg),
+        // Join the parent's phone numbers if they exist.
+        parentPhoneNumbers: getParentPhoneNumbers(reg),
 
-    isCheckedOut: reg.isCheckedOut || false,
-    nameOfParentCheckedOut: reg.nameOfParentCheckedOut || "",
-    checkedOutTime: reg.checkedOutTime?.toDate(),
-    internalNotes: reg.internalNotes,
-  }))
+        isCheckedOut: reg.isCheckedOut || false,
+        nameOfParentCheckedOut: reg.nameOfParentCheckedOut || "",
+        checkedOutTime: reg.checkedOutTime?.toDate(),
+        internalNotes: reg.internalNotes,
+      })),
+    [registrationData]
+  )
 
   const updateRow = async (
     newRow: CamperCheckoutRow,
@@ -180,7 +190,7 @@ export default function CamperCheckout({
     <>
       <Card>
         <CardHeader
-          title="2023 LYF Camp Camper Checkout"
+          title={`${campYear} LYF Camp Camper Checkout`}
           titleTypographyProps={{
             align: "center",
             variant: "h4",

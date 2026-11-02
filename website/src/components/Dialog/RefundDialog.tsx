@@ -220,16 +220,20 @@ export default function RefundDialog({
     payment: Payment,
     value: number
   ) => {
-    value
-      ? changesRef.current.refunds.set(regKey, { amount: value, payment })
-      : changesRef.current.refunds.delete(regKey)
+    if (value) {
+      changesRef.current.refunds.set(regKey, { amount: value, payment })
+    } else {
+      changesRef.current.refunds.delete(regKey)
+    }
     updateChangeCount(value !== null)
   }
 
   const handleCancelChange = (reg: RegistrationData, cancelled: boolean) => {
-    cancelled
-      ? changesRef.current.cancellations.add(reg)
-      : changesRef.current.cancellations.delete(reg)
+    if (cancelled) {
+      changesRef.current.cancellations.add(reg)
+    } else {
+      changesRef.current.cancellations.delete(reg)
+    }
     updateChangeCount(cancelled)
   }
 
@@ -247,19 +251,18 @@ export default function RefundDialog({
     await Promise.all(
       [...changesRef.current.refunds.entries()].map(async ([, metadata]) => {
         try {
-          const response = await issueStripeRefund({
+          await issueStripeRefund({
             stripeId: metadata.payment.stripeId,
             amount: metadata.amount * 100, // dollars -> cents
             isTestData: isTestData,
           })
-          console.log(response)
           await updateDoc(metadata.payment.ref, {
             balance:
               (metadata.payment.balance ?? metadata.payment.total!) -
               metadata.amount,
           })
         } catch (e) {
-          console.log(`error\n${e}`)
+          console.error("Refund failed", e)
         }
       })
     )
@@ -296,9 +299,9 @@ export default function RefundDialog({
         <Button onClick={handleDialogClose}>Cancel</Button>
         <AnimatedButtonWithLoading
           asyncOnClick={handleRefunds}
-          onMouseDown={(e) => {
-            e.preventDefault
-          }}
+          // No onMouseDown preventDefault here: the refund NumberInputs
+          // commit their value on blur, and pressing this button is what
+          // blurs the field being edited.
           variant="outlined"
           boopProps={{}}
           disabled={!(changes > 0)}

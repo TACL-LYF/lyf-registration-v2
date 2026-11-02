@@ -3,6 +3,7 @@
  */
 
 import { CampTrack, CampTrackInfo, CampYear } from "./camp"
+import type { Family } from "./families"
 
 /**
  * Current version of the Firestore document schema. Bump when the shape of
@@ -14,8 +15,11 @@ import { CampTrack, CampTrackInfo, CampYear } from "./camp"
  *   1 (implicit) — 2023-2025 layout: health + demographics inline on camper docs
  *   2 — RBAC revamp: health/demographics moved to private/ sub-documents,
  *       familyEmails denormalized onto registrations, emails normalized lowercase
+ *   3 — Admin-grid denormalization: camper profile fields + parentContacts on
+ *       registrations; spotReserved capacity flag; new registrations use the
+ *       camper id as their document id (camps/{year}/registrations/{camperId})
  */
-export const CURRENT_SCHEMA_VERSION = 2
+export const CURRENT_SCHEMA_VERSION = 3
 
 /**
  * Canonical form for emails used as identity keys (family membership,
@@ -27,8 +31,79 @@ export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase()
 }
 
-export function normalizeEmails(emails: (string | undefined | null)[]): string[] {
-  return [...new Set(emails.filter((e): e is string => !!e).map(normalizeEmail))]
+/** Longest image URL the camp-year callable stores (and the dashboard sends). */
+export const MAX_IMAGE_URL_LENGTH = 2048
+
+/**
+ * Whether `value` may be used as an <img src> for camps/{year} images
+ * (infoSessionImageUrl, emailHeaderImageUrl). The URL lands on the public
+ * registration page and in every confirmation email, so it must be an
+ * absolute https URL (the site's CSP only allows https images, and http
+ * would be mixed content), carry no embedded credentials, and be a sane
+ * length. Trim before calling; an empty string is not allowed (callers treat
+ * empty as "unset" themselves).
+ */
+/**
+ * Mailchimp audience ("list") ids are short lowercase hex strings such as
+ * "2bd94e4a2c" (Audience → Settings → Audience name and defaults). The id
+ * is pasted into the Camp Year tab and then used in Mailchimp API URLs, so
+ * only that shape is stored. Trim before calling; an empty string is not
+ * allowed (callers treat empty as "unset" themselves).
+ */
+export const MAILCHIMP_LIST_ID_PATTERN = /^[a-z0-9]{6,32}$/
+
+export function isMailchimpListId(value: unknown): value is string {
+  return typeof value === "string" && MAILCHIMP_LIST_ID_PATTERN.test(value)
+}
+
+export function isAllowedImageUrl(value: unknown): value is string {
+  if (typeof value !== "string") return false
+  if (value.length === 0 || value.length > MAX_IMAGE_URL_LENGTH) return false
+  if (value !== value.trim()) return false
+  let parsed: URL
+  try {
+    parsed = new URL(value)
+  } catch {
+    return false
+  }
+  return (
+    parsed.protocol === "https:" &&
+    parsed.username === "" &&
+    parsed.password === ""
+  )
+}
+
+export function normalizeEmails(
+  emails: (string | undefined | null)[]
+): string[] {
+  return [
+    ...new Set(emails.filter((e): e is string => !!e).map(normalizeEmail)),
+  ]
+}
+
+/**
+ * Whether `email` belongs to `family` on its own account, as opposed to merely
+ * having been listed as a co-parent by whoever registered.
+ *
+ * `Family.emails` is the authorization key for family data, and any parent can
+ * put any address in it. So a listing by someone else is not proof of
+ * membership: a stranger could otherwise pre-claim an email and have that
+ * person's campers, health info and registrations land in a family the
+ * stranger can read. A member is established when they created the family,
+ * previously confirmed it as theirs, or are its only member (nobody else could
+ * have listed them). Anyone else must confirm the family explicitly before
+ * the server will register them into it; the website asks, the function
+ * enforces, and both use this one rule.
+ */
+export function isEstablishedFamilyMember(
+  family: Family,
+  email: string
+): boolean {
+  const me = normalizeEmail(email)
+  if (family.createdBy && normalizeEmail(family.createdBy) === me) return true
+  if (normalizeEmails(family.confirmedEmails ?? []).includes(me)) return true
+  const others = normalizeEmails(family.emails ?? []).filter((e) => e !== me)
+  return others.length === 0
 }
 
 /**

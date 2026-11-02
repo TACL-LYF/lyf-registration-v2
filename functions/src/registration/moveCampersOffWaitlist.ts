@@ -4,8 +4,6 @@ import {formatInTimeZone} from "date-fns-tz";
 import {logger} from "firebase-functions";
 import {onCall} from "firebase-functions/v2/https";
 import * as Mustache from "mustache";
-import * as fs from "fs";
-import * as path from "path";
 
 import {
   combineNames,
@@ -16,16 +14,26 @@ import {
   sanitizeForEmailHeader,
 } from "../utils";
 import {
+  CampTrack,
+  CampYear,
+  Registration,
   RegistrationStatus,
   MoveCampersOffWaitlistRequest,
+  validateCampYearWrite,
+  validateMoveCampersOffWaitlistRequest,
+  validateRegistrationWrite,
 } from "lyf-registration-schemas";
+import {DocumentReference, FieldValue} from "firebase-admin/firestore";
+import {applySpotDelta} from "../registrationUtils";
+import {getEmailHeaderImageUrl} from "../registrationUtils/emailHeaderImage";
+import {loadEmailTemplate} from "../registrationUtils/emailTemplates";
 import {sendMessageToRegistrationErrorMessages} from "../slack/slackChannelWebhooks";
 import {
   assertAdmin,
-  callableOptions,
+  adminCallableOptions,
 } from "../utils/auth";
 import {withSentryCallable} from "../utils/sentry";
-import mjml2html from "mjml";
+import {parseCallablePayload} from "../utils/validate";
 
 // Ensure that all variables wrapped in {{}} are represented here
 type BodyTemplateInput = {
@@ -34,23 +42,16 @@ type BodyTemplateInput = {
   registrationDate: string;
   camperName: string;
   campTrack: string;
+  /** camps/{year}.emailHeaderImageUrl; the template falls back when unset. */
+  emailHeaderImageUrl: string | undefined;
 };
-
-const mjmlTemplate = fs.readFileSync(
-  path.resolve(__dirname, "../emailTemplates/offWaitlistTemplate.mjml"),
-  {encoding: "utf8"}
-);
-
-const htmlTemplate = mjml2html(mjmlTemplate, {
-  minify: true, // Making it smalle rto save on email file size
-}).html;
 
 /**
  * Moves campers off of the waitlist by marking their registration as pending payment and sending
  * an email to the parent informing their campers are off the waitlist.
  */
 export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
-  callableOptions,
+  adminCallableOptions,
   withSentryCallable("moveCampersOffWaitlist", async (request) => {
     await assertAdmin(request, "manageWaitlist");
 
@@ -62,7 +63,10 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
       registrationId,
       campTrack,
       isTestData,
-    } = request.data;
+    } = parseCallablePayload(
+      validateMoveCampersOffWaitlistRequest,
+      request.data
+    );
 
     const db = getFirestoreDb(!isTestData);
 
@@ -70,11 +74,50 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
       parentNames.map((p) => getFirstName(p))
     );
 
-    // Mark registrations as pending payment so that they'll pass through our createRegistrationSession function.
+    // Mark the registration as pending payment so that it passes through our
+    // createRegistrationSession function, and reserve its spot now: the admin
+    // is explicitly granting one, so decrement the track (flooring at 0) in
+    // the same transaction. A registration that already holds a spot is not
+    // decremented again (e.g. the button was clicked twice).
     try {
-      await db
-        .doc(`camps/${campYear}/registrations/${registrationId}`)
-        .update({status: RegistrationStatus.PENDING_PAYMENT});
+      const campRef = db
+        .collection("camps")
+        .doc(campYear.toString()) as DocumentReference<CampYear>;
+      const registrationRef = campRef
+        .collection("registrations")
+        .doc(registrationId) as DocumentReference<Registration>;
+
+      await db.runTransaction(async (t) => {
+        const campSnapshot = await t.get(campRef);
+        const registrationSnapshot = await t.get(registrationRef);
+        if (!registrationSnapshot.exists) {
+          throw new Error(`Registration ${registrationRef.path} not found`);
+        }
+        const registration = registrationSnapshot.data();
+
+        t.update(
+          registrationRef,
+          validateRegistrationWrite({
+            status: RegistrationStatus.PENDING_PAYMENT,
+            spotReserved: true,
+            updatedAt: FieldValue.serverTimestamp(),
+          })
+        );
+
+        if (registration?.spotReserved === true) return;
+        const track = registration?.campTrack ?? (campTrack as CampTrack);
+        t.set(
+          campRef,
+          validateCampYearWrite({
+            remainingSpots: applySpotDelta(
+              campSnapshot.data()?.remainingSpots,
+              track,
+              -1
+            ),
+          }),
+          {merge: true}
+        );
+      });
     } catch (e) {
       Sentry.captureException(e);
       logger.error(e);
@@ -95,13 +138,17 @@ export const moveCampersOffWaitlist = onCall<MoveCampersOffWaitlistRequest>(
       registrationDate: formatInTimeZone(
         addDays(new Date(), 7),
         "America/Los_Angeles",
-        "EEEE MMM do, Y"
+        "EEEE MMM do, y"
       ),
       camperName: camperName,
       campTrack: campTrack,
+      emailHeaderImageUrl: await getEmailHeaderImageUrl(db, campYear),
     };
 
-    const htmlBody = Mustache.render(htmlTemplate, templateInput);
+    const htmlBody = Mustache.render(
+      loadEmailTemplate("offWaitlistTemplate"),
+      templateInput
+    );
 
     return emailTransport.sendMail({
       from: `TACL-LYF <${REGISTRATION_EMAIL}>`,

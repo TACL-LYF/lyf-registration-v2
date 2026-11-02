@@ -1,19 +1,41 @@
 import React from "react"
+import { Dayjs } from "dayjs"
 import { Box, Divider, Link, Stack, Typography } from "@mui/material"
 
 import RegistrationStep from "./RegistrationStep"
-import { CampTrackInfo } from "lyf-registration-schemas"
-import { StaticImage } from "gatsby-plugin-image"
+import { CampTrackInfo, isAllowedImageUrl } from "lyf-registration-schemas"
+import { formatCampDateWithYear } from "@utils/campTime"
+import fallbackBanner from "../../images/vis_2026.jpg"
 
 type InfoStepProps = {
   campTracksInfo: CampTrackInfo[]
+  campYear: number
+  /** camps/{year}.infoSessionDate; the sentence is omitted when unset. */
+  infoSessionDate: Dayjs | null
+  /** camps/{year}.infoSessionImageUrl; the bundled banner is used when unset. */
+  infoSessionImageUrl?: string
+  /** camps/{year}.showRemainingSpots (hidden since 2026 unless switched on). */
+  showRemainingSpots?: boolean
 }
 
-/// Changed in 2026 to hide remaing spots per camp track
-const SHOW_REMAINING_SPOTS = false
-
 // TODO: Move this into a CMS to better manage support
-export default function InfoStep({ campTracksInfo }: InfoStepProps) {
+// The long notice copy below is still edited by hand each year; the year,
+// info-session date, banner image and the remaining-spots toggle come from
+// camps/{year} (Camp Year tab).
+export default function InfoStep({
+  campTracksInfo,
+  campYear,
+  infoSessionDate,
+  infoSessionImageUrl,
+  showRemainingSpots = false,
+}: InfoStepProps) {
+  // A runtime URL cannot go through StaticImage, so this is a plain <img>.
+  // Only an allowed https URL is used (the callable stores nothing else, but
+  // the public document is re-checked here anyway); otherwise the bundled one.
+  const configuredBanner = infoSessionImageUrl?.trim() ?? ""
+  const bannerSrc = isAllowedImageUrl(configuredBanner)
+    ? configuredBanner
+    : fallbackBanner
   return (
     <RegistrationStep
       primaryButtonText="Next"
@@ -29,11 +51,15 @@ export default function InfoStep({ campTracksInfo }: InfoStepProps) {
             width: 1,
           }}
         >
-          <StaticImage
-            src="../../images/vis_2026.jpg"
+          <Box
+            component="img"
+            src={bannerSrc}
             alt="LYF Virtual Info Session banner"
-            formats={["webp"]}
-            style={{
+            referrerPolicy="no-referrer"
+            sx={{
+              display: "block",
+              width: 1,
+              height: "auto",
               borderRadius: "16px",
             }}
           />
@@ -48,7 +74,7 @@ export default function InfoStep({ campTracksInfo }: InfoStepProps) {
         }}
       >
         <Typography variant="h4" sx={{ paddingBottom: 1 }}>
-          Important notice for TACL-LYF Camp 2026!
+          Important notice for TACL-LYF Camp {campYear}!
         </Typography>
         <Typography variant="body1">
           TACL-LYF Camp will be split into two age-specific tracks: younger
@@ -89,13 +115,18 @@ export default function InfoStep({ campTracksInfo }: InfoStepProps) {
 
         <Typography variant="body1">
           Please contact us with any questions or concerns at{" "}
-          <Link href="mailto:lyf@tacl.org">lyf@tacl.org</Link> . We will also be
-          hosting a{" "}
-          <Link href="https://luma.com/3i4afmyf">
-            Virtual Parent Info Session
-          </Link>{" "}
-          on February 4th, 2026, where we will be going over camp in more
-          detail.
+          <Link href="mailto:lyf@tacl.org">lyf@tacl.org</Link>.
+          {infoSessionDate && (
+            <>
+              {" "}
+              We will also be hosting a{" "}
+              <Link href="https://luma.com/3i4afmyf">
+                Virtual Parent Info Session
+              </Link>{" "}
+              on {formatCampDateWithYear(infoSessionDate)}, where we will be
+              going over camp in more detail.
+            </>
+          )}
         </Typography>
 
         <Divider
@@ -104,7 +135,7 @@ export default function InfoStep({ campTracksInfo }: InfoStepProps) {
             marginBottom: 1,
           }}
         />
-        {SHOW_REMAINING_SPOTS &&
+        {showRemainingSpots &&
           campTracksInfo.map(({ track, remainingSpots }) => (
             <Typography key={track}>
               <b>{track} Camp Track</b>: {remainingSpots} spots remaining

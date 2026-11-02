@@ -2,6 +2,7 @@ import React, { createContext } from "react"
 
 import {
   Camper,
+  Demographics,
   Family,
   Parent,
   RegistrationData as Registration2024Data,
@@ -29,6 +30,7 @@ export enum RegistrationActionType {
   PrefillFamily = 15,
   LoadPendingPaymentRegistrations = 16,
   EditHousehold = 17,
+  SetJoinFamily = 18,
 }
 
 export interface RegistrationBaseAction {
@@ -38,20 +40,20 @@ export interface RegistrationBaseAction {
 export interface RegistrationEditAction extends RegistrationBaseAction {
   index: number
   keyToChange: string
-  newValue: any
+  newValue: unknown
 }
 
 export interface RegistrationEditFamilyAction extends RegistrationBaseAction {
   keyToChange: string
-  newValue: any
+  newValue: unknown
 }
 
 export interface RegistrationEditHouseholdAction extends RegistrationBaseAction {
   keyToChange: string
-  newValue: any
+  newValue: unknown
 }
 
-export interface RegistrationAddAction extends RegistrationBaseAction {}
+export type RegistrationAddAction = RegistrationBaseAction
 
 export interface RegistrationRemoveAction extends RegistrationBaseAction {
   index: number
@@ -89,6 +91,13 @@ export interface RegistrationLoadPendingPaymentRegistrationsAction
   familyData: FamilyData
 }
 
+// Records the parent's answer to "is this existing family yours?": the
+// family's id, or null to register into a family of their own.
+export interface RegistrationSetJoinFamilyAction
+  extends RegistrationBaseAction {
+  joinFamilyId: string | null
+}
+
 export type RegistrationAction =
   | RegistrationAddAction
   | RegistrationEditAction
@@ -99,6 +108,59 @@ export type RegistrationAction =
   | RegistrationPrefillParentAction
   | RegistrationPrefillFamilyAction
   | RegistrationLoadPendingPaymentRegistrationsAction
+  | RegistrationSetJoinFamilyAction
+
+// The in-progress registration is mirrored to localStorage on every reducer
+// action, and the step the family reached is stored next to it, so a later
+// visit can offer to pick up where they left off.
+export const REGISTRATION_STORAGE_KEY = "registration"
+export const REGISTRATION_STEP_STORAGE_KEY = "registrationStep"
+
+export type SavedRegistrationSession = {
+  data: RegistrationData
+  /** CheckoutFlow step index the family was on when the data was last saved. */
+  step: number
+}
+
+export function saveRegistrationStep(step: number) {
+  window.localStorage.setItem(REGISTRATION_STEP_STORAGE_KEY, step.toString())
+}
+
+export function clearSavedRegistration() {
+  window.localStorage.removeItem(REGISTRATION_STORAGE_KEY)
+  window.localStorage.removeItem(REGISTRATION_STEP_STORAGE_KEY)
+}
+
+/**
+ * The session an earlier visit left behind, or null when there is nothing
+ * worth offering to restore: no saved data, data that cannot be parsed, or a
+ * visit that never got past the Info step. The last case matters because the
+ * automatic prefill from the server already writes the cache, so without it
+ * every return visit would be asked about a "previous session" that holds
+ * nothing the family typed.
+ */
+export function readSavedRegistrationSession(): SavedRegistrationSession | null {
+  const stored = window.localStorage.getItem(REGISTRATION_STORAGE_KEY)
+  if (!stored) {
+    return null
+  }
+  let data: RegistrationData
+  try {
+    data = JSON.parse(stored)
+  } catch {
+    return null
+  }
+  if (!data || !Array.isArray(data.campers)) {
+    return null
+  }
+  const step = parseInt(
+    window.localStorage.getItem(REGISTRATION_STEP_STORAGE_KEY) ?? "0"
+  )
+  if (!Number.isInteger(step) || step <= 0) {
+    return null
+  }
+  return { data, step }
+}
 
 /**
  * Reducer that handles all of the state management for registrationState. Note that we have to always return a new copy of the registrationState
@@ -192,15 +254,16 @@ export function registrationReducer(
       break
     }
     case RegistrationActionType.LoadFromCache: {
-      const storedRegistrationState =
-        window.localStorage.getItem("registration")
+      const storedRegistrationState = window.localStorage.getItem(
+        REGISTRATION_STORAGE_KEY
+      )
       if (!storedRegistrationState) {
         break
       }
 
       try {
         changedState = JSON.parse(storedRegistrationState)
-      } catch (e) {
+      } catch {
         changedState = registrationState
       }
       break
@@ -208,14 +271,14 @@ export function registrationReducer(
     case RegistrationActionType.SetNumOfCampers: {
       const { numOfCampers } = action as RegistrationSetNumOfCampersAction
       const currentNumOfCampers = registrationState.campers.length
-      let newCampers =
+      const newCampers =
         currentNumOfCampers < numOfCampers
           ? [
               ...registrationState.campers,
               ...Array(numOfCampers - currentNumOfCampers).fill({}),
             ]
           : registrationState.campers.slice(0, numOfCampers)
-      let newDemographics =
+      const newDemographics =
         currentNumOfCampers < numOfCampers
           ? [
               ...registrationState.demographics,
@@ -264,7 +327,7 @@ export function registrationReducer(
       const { index, camper } = action as RegistrationPrefillCamperAction
       // Remove the document reference so it doesn't reference itself.
       // Also remove the registrations since Firebase has trouble parsing these.
-      const { ref, registrations, demographics, ...rest } = camper as typeof camper & { demographics?: Record<string, any> }
+      const { ref, registrations, demographics, ...rest } = camper as typeof camper & { demographics?: Demographics }
 
       // Update the camper
       const originalCamper = registrationState.campers[index]
@@ -366,7 +429,7 @@ export function registrationReducer(
           registrations,
           demographics,
           ...camperWithoutFirebaseTypes
-        } = matchingCamper as typeof matchingCamper & { demographics?: Record<string, any> }
+        } = matchingCamper as typeof matchingCamper & { demographics?: Demographics }
 
         // Be sure not to accidentally push any firebase types into this object. That messes with the upload later on.
         updatedCampers.push({
@@ -400,6 +463,14 @@ export function registrationReducer(
       }
       break
     }
+    case RegistrationActionType.SetJoinFamily: {
+      const { joinFamilyId } = action as RegistrationSetJoinFamilyAction
+      changedState = {
+        ...registrationState,
+        joinFamilyId,
+      }
+      break
+    }
     default: {
       throw Error("Unknown action: " + action.type)
     }
@@ -407,15 +478,20 @@ export function registrationReducer(
 
   // Save the state to local storage.
   if (action.type !== RegistrationActionType.ClearData) {
-    window.localStorage.setItem("registration", JSON.stringify(changedState))
+    window.localStorage.setItem(
+      REGISTRATION_STORAGE_KEY,
+      JSON.stringify(changedState)
+    )
   } else {
-    window.localStorage.removeItem("registration")
+    clearSavedRegistration()
   }
 
   return changedState
 }
 
-export function createEmptyRegistrationData(campYear: number) {
+export function createEmptyRegistrationData(
+  campYear: number
+): RegistrationData {
   return {
     campYear: campYear,
     family: {},
@@ -424,11 +500,10 @@ export function createEmptyRegistrationData(campYear: number) {
     demographics: [{}],
     household: {},
     donation: 0,
+    joinFamilyId: null,
   }
 }
 
-// @ts-ignore Null will immediately be set by the parent component
 export const RegistrationDataContext = createContext<RegistrationData>(null)
-// @ts-ignore Null will immediately be set by the parent component
 export const RegistrationDispatchContext =
   createContext<React.Dispatch<RegistrationAction>>(null)

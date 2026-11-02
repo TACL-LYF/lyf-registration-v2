@@ -7,11 +7,15 @@ import {
   ManageAdminResponse,
   normalizeEmail,
   resolveAdminRole,
+  validateAdminAuditLogEntryWrite,
+  validateAdminWrite,
+  validateManageAdminRequest,
 } from "lyf-registration-schemas";
 
 import {db} from "../utils";
-import {assertAdmin, callableOptions} from "../utils/auth";
+import {adminCallableOptions, assertAdmin} from "../utils/auth";
 import {withSentryCallable} from "../utils/sentry";
+import {parseCallablePayload} from "../utils/validate";
 
 /**
  * The only write path for the admin roster. Firestore rules deny client
@@ -20,20 +24,22 @@ import {withSentryCallable} from "../utils/sentry";
  *  - refuse self-demotion/removal
  *  - append an entry to `adminAuditLog`
  *
- * The roster lives in the production database only — it is global, not per
- * test/prod data set.
+ * The roster is written to the production database only — it is global, not
+ * per test/prod data set. Security rules can only read the database they
+ * guard, so `replicateAdminsToTest` mirrors every change into the test
+ * database; nothing here (or anywhere else) should write there directly.
  */
 export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminResponse>>(
-  callableOptions,
+  adminCallableOptions,
   withSentryCallable("manageAdmin", async (request) => {
     const {email: actorEmail} = await assertAdmin(request, "manageAdmins");
     const actor = normalizeEmail(actorEmail);
 
-    const {action} = request.data;
-    const target = normalizeEmail(request.data.email ?? "");
-    if (!target.includes("@")) {
-      throw new HttpsError("invalid-argument", "A valid email is required");
-    }
+    // Checks the action, that the email looks like one, and that role /
+    // disabled are present for the actions that need them.
+    const payload = parseCallablePayload(validateManageAdminRequest, request.data);
+    const {action} = payload;
+    const target = normalizeEmail(payload.email);
     const isSelf = target === actor;
 
     const adminsRef = db.collection("admins");
@@ -57,12 +63,15 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
           if (snap.exists) {
             throw new HttpsError("already-exists", `${target} is already an admin`);
           }
-          const role = resolveAdminRole(request.data.role);
+          const role = resolveAdminRole(payload.role);
           if (!role) {
             throw new HttpsError("invalid-argument", "A valid role is required");
           }
           after = {role, addedBy: actor, disabled: false};
-          tx.set(targetRef, {...after, addedAt: FieldValue.serverTimestamp()});
+          tx.set(
+            targetRef,
+            validateAdminWrite({...after, addedAt: FieldValue.serverTimestamp()})
+          );
           break;
         }
 
@@ -70,7 +79,7 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
           if (!before) {
             throw new HttpsError("not-found", `${target} is not an admin`);
           }
-          const role = resolveAdminRole(request.data.role);
+          const role = resolveAdminRole(payload.role);
           if (!role) {
             throw new HttpsError("invalid-argument", "A valid role is required");
           }
@@ -87,7 +96,7 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
             );
           }
           after = {...before, role};
-          tx.update(targetRef, {role});
+          tx.update(targetRef, validateAdminWrite({role}));
           break;
         }
 
@@ -95,7 +104,7 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
           if (!before) {
             throw new HttpsError("not-found", `${target} is not an admin`);
           }
-          const disabled = request.data.disabled === true;
+          const disabled = payload.disabled === true;
           if (isSelf) {
             throw new HttpsError(
               "failed-precondition",
@@ -109,7 +118,7 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
             );
           }
           after = {...before, disabled};
-          tx.update(targetRef, {disabled});
+          tx.update(targetRef, validateAdminWrite({disabled}));
           break;
         }
 
@@ -138,14 +147,17 @@ export const manageAdmin = onCall<ManageAdminRequest, Promise<ManageAdminRespons
           throw new HttpsError("invalid-argument", `Unknown action: ${action}`);
       }
 
-      tx.set(db.collection("adminAuditLog").doc(), {
-        actor,
-        action,
-        target,
-        before,
-        after,
-        at: FieldValue.serverTimestamp(),
-      });
+      tx.set(
+        db.collection("adminAuditLog").doc(),
+        validateAdminAuditLogEntryWrite({
+          actor,
+          action,
+          target,
+          before,
+          after,
+          at: FieldValue.serverTimestamp(),
+        })
+      );
     });
 
     logger.info(`manageAdmin: ${actor} ${action} ${target}`);

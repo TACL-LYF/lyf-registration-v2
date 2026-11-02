@@ -38,6 +38,30 @@ export const callableOptions = {
 };
 
 /**
+ * The website's own origins — the only pages that should ever call the
+ * admin callables from a browser. Same list Stripe may redirect back to, so
+ * adding a host is one environment variable.
+ */
+export const SITE_ORIGINS: readonly string[] = ALLOWED_REDIRECT_ORIGINS;
+
+/**
+ * Options for callables that only the admin dashboard uses (manageAdmin,
+ * manageCampYear, moveCampersOffWaitlist, issueStripeRefund).
+ *
+ * CORS is limited to SITE_ORIGINS, so a page on any other origin cannot make
+ * a browser call these functions even with a signed-in admin's session. This
+ * is defence in depth, not the access control: a non-browser client can set
+ * any Origin header, and the real gate remains assertAdmin (Firebase Auth +
+ * the admins/ roster) inside each function. To bind calls to the genuine
+ * web app itself, enable Firebase App Check and add `enforceAppCheck: true`
+ * here once the site initialises it.
+ */
+export const adminCallableOptions = {
+  cors: [...SITE_ORIGINS],
+  invoker: "public" as const,
+};
+
+/**
  * Looks up the caller's admin role from the `admins` Firestore collection.
  * Fails closed: a missing doc, a disabled admin, or an unknown/missing role
  * value all resolve to null.
@@ -161,6 +185,20 @@ export function validateDollarAmount(
 }
 
 /**
+ * True when the caller is an admin whose role grants the capability.
+ * Never throws for a non-admin; use assertAdmin to enforce.
+ */
+export async function callerHasCapability(
+  request: CallableRequest,
+  capability: Capability
+): Promise<boolean> {
+  if (!request.auth?.token?.email) return false;
+
+  const {role} = await getCallerAdminRole(request);
+  return roleHasCapability(role, capability);
+}
+
+/**
  * Resolves whether the caller is allowed to use test data.
  * Only admins whose role grants the createTestData capability may set
  * isTestData=true; everyone else is silently forced to production mode.
@@ -170,8 +208,20 @@ export async function resolveTestDataFlag(
   requestedIsTestData: boolean
 ): Promise<boolean> {
   if (!requestedIsTestData) return false;
-  if (!request.auth?.token?.email) return false;
+  return callerHasCapability(request, "createTestData");
+}
 
-  const {role} = await getCallerAdminRole(request);
-  return roleHasCapability(role, "createTestData");
+/**
+ * Resolves whether the caller may force every camper in the request onto the
+ * waitlist. This is a testing aid, so it is gated the same way as test data:
+ * a non-admin's `forceWaitlist: true` is silently ignored. Honouring it for
+ * everyone let a caller pad a request with waitlisted (unpaid) campers that
+ * still counted toward the sibling discount.
+ */
+export async function resolveForceWaitlistFlag(
+  request: CallableRequest,
+  requestedForceWaitlist: boolean
+): Promise<boolean> {
+  if (!requestedForceWaitlist) return false;
+  return callerHasCapability(request, "createTestData");
 }

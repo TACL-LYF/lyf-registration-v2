@@ -22,6 +22,13 @@ export type CampTrackInfo = {
   remainingSpots: number
 }
 
+/**
+ * Pre-registration price used when camps/{year}.preRegistrationFee is unset.
+ * Must match the fallback in functions/src/preRegistration/createPreRegistrationSession.ts,
+ * which prices the Stripe session from the same document.
+ */
+export const DEFAULT_PRE_REGISTRATION_FEE = 500
+
 // Every CampYear document has a subcollection of registrations associated with it.
 export type CampYear = Partial<{
   campEndDate: Timestamp
@@ -49,6 +56,32 @@ export type CampYear = Partial<{
   shirtPrice: number
   siblingDiscount: number
 
+  // Pre-registration window for *this* camp year. It runs during the previous
+  // summer's camp (the pre-registration page for 2027 is open while camp 2026
+  // is happening), so these dates fall in the year before the camp.
+  preRegistrationOpenDate: Timestamp
+  preRegistrationCloseDate: Timestamp
+
+  // Virtual Parent Info Session, shown on the registration InfoStep.
+  infoSessionDate: Timestamp
+  // Banner shown beside the InfoStep notice (http(s) URL). Unset or empty
+  // falls back to the image bundled with the website.
+  infoSessionImageUrl: string
+  // Hero image at the top of the registration / waitlist / off-waitlist
+  // emails (http(s) URL). Unset or empty falls back to the template's image.
+  emailHeaderImageUrl: string
+  // Mailchimp audience ("list") that this year's registered and
+  // pre-registered parents are added to, tagged with the camp year and
+  // track. The directors create a new audience per camp year, so the id
+  // lives here rather than in code. Unset or empty falls back to the
+  // permanent general audience (see functions/src/utils/mailchimp.ts).
+  mailchimpListId: string
+
+  // Display toggles, flipped from the Camp Year tab. Missing means false.
+  showWaitlistHeaderBar: boolean /* Waitlist bar above the registration flow */
+  showRemainingSpots: boolean /* Spots-remaining lines on the InfoStep */
+  showWaitlistPosition: boolean /* Waitlist position on the family profile */
+
   // Used to determine at what point do we start waitlisting campers.
   // Purposely separate from campSizeCap because we don't want cancellations to open up spots that could bypass
   // the waitlist.
@@ -64,6 +97,14 @@ export enum RegistrationStatus {
   PROCESSING_PAYMENT = "Processing Payment",
 }
 
+// Subset of Parent denormalized onto each registration (see Registration.parentContacts).
+export type ParentContact = {
+  firstName: string
+  lastName: string
+  email: string
+  phoneNumber: string
+}
+
 // Information that changes year to year
 export type Registration = Partial<{
   camperName: string
@@ -72,6 +113,9 @@ export type Registration = Partial<{
 
   grade: number
   isPreRegistered: boolean
+  // Dollars paid toward this registration so far. Written (incremented) by
+  // fulfillPreRegistrations when the pre-registration deposit lands.
+  amountPaid: number
   status: RegistrationStatus
   shirtSize: string
   isReturning: boolean
@@ -111,6 +155,34 @@ export type Registration = Partial<{
   // Test Data
   isTestData: boolean
 
+  // ---- Denormalized for the admin grid (schemaVersion 3) ----
+  // Tier-0 camper profile fields copied from families/{f}/campers/{c} so the
+  // admin dashboard needs no per-row camper read. NEVER copy health or
+  // demographics here: this document is readable by every admin role, and
+  // those live under private/ precisely so rules can gate them by role.
+  // Kept in sync by the registration function on write and by the
+  // syncCamperProfile trigger when a parent edits the camper from the profile.
+  // firstName/lastName are kept alongside camperName so exports and name
+  // matching never have to split the joined name.
+  firstName: string
+  lastName: string
+  preferredName: string | null
+  birthDate: string
+  gender: string[]
+  pronouns: string | null
+  // Parent contact info copied from families/{f}/parents, ordered like
+  // Family.emails (signed-in parent first). Written by the registration
+  // function; parents cannot edit parent docs from the client.
+  parentContacts: ParentContact[]
+
+  // ---- Capacity accounting ----
+  // True once this registration has been counted against
+  // CampYear.remainingSpots (reserved in the registration transaction, or by
+  // moveCampersOffWaitlist). The Stripe webhook and the camp-credit fast path
+  // must not decrement again when this is set; checkout.session.expired
+  // releases the hold and clears it.
+  spotReserved: boolean
+
   // Denormalized from the parent family for Firestore rule ownership checks.
   // Always lowercase (see normalizeEmail in utils.ts).
   familyEmails: string[]
@@ -118,3 +190,45 @@ export type Registration = Partial<{
   // See CURRENT_SCHEMA_VERSION in utils.ts
   schemaVersion: number
 }>
+
+/**
+ * Stored at: config/site — one document, readable by anyone (the time gates
+ * run before sign-in), written only by the manageCampYear callable.
+ *
+ * Points the website at the right camps/{year} documents so the yearly
+ * rollover is a dashboard action instead of a code change.
+ */
+export type SiteConfig = Partial<{
+  /** The camp year the registration page and home page are for. */
+  currentCampYear: number
+  /** The camp year the pre-registration page sells (normally currentCampYear + 1). */
+  preRegistrationCampYear: number
+  updatedAt: Timestamp
+  updatedBy: string
+}>
+
+export const SITE_CONFIG_PATH = "config/site"
+
+/**
+ * Stored at: camps/{year}/private/bypass/emails/{email} — one document per
+ * email (lowercase) allowed through the registration time gate after
+ * registrationCloseDate, e.g. a family that missed the deadline. Replaces the
+ * TEMP_ALLOWED_EMAILS literal that used to live in pages/registration.tsx.
+ *
+ * Kept out of the public camps/{year} document on purpose: a parent may read
+ * only their own entry (so nobody can enumerate who got an extension), admins
+ * may list them, and only the manageCampYear callable writes them.
+ */
+export type RegistrationBypassEntry = Partial<{
+  email: string
+  addedBy: string
+  addedAt: Timestamp
+}>
+
+export const registrationBypassCollectionPath = (year: number | string) =>
+  `camps/${year}/private/bypass/emails`
+
+export const registrationBypassDocPath = (
+  year: number | string,
+  email: string
+) => `${registrationBypassCollectionPath(year)}/${email}`

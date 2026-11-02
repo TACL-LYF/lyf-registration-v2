@@ -11,7 +11,15 @@ export default defineConfig([
   tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
   {
-    files: ["test/**/*.js"],
+    files: ["test/unit/**/*.ts"],
+    languageOptions: { globals: { ...globals.node, ...globals.jest } },
+  },
+  {
+    files: ["jest.config.js"],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    files: ["test/**/*.js", "scripts/**/*.js"],
     languageOptions: { globals: globals.node },
     rules: {
       "@typescript-eslint/no-require-imports": "off",

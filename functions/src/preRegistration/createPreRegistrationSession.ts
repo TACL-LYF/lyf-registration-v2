@@ -17,11 +17,13 @@ import {
   validateRedirectUrl,
 } from "../utils/auth";
 import {withSentryCallable} from "../utils/sentry";
+import {parseCallablePayload} from "../utils/validate";
 
 // Import schema
 import {
   CampYear,
   PreRegistrationInputPayload,
+  validatePreRegistrationPayload,
 } from "lyf-registration-schemas";
 
 export interface PreRegistrationLineItemMetadata extends Stripe.Metadata {
@@ -48,7 +50,7 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
       successUrl,
       cancelUrl,
       isTestData: requestedTestData = false,
-    } = request.data;
+    } = parseCallablePayload(validatePreRegistrationPayload, request.data);
 
     const authEmail = request.auth.token.email;
     if (!authEmail || authEmail.toLowerCase() !== email.toLowerCase()) {
@@ -85,6 +87,15 @@ export const createPreRegistrationSession = onCall<PreRegistrationInputPayload>(
         throw new HttpsError(
           "permission-denied",
           "You do not have permission to pre-register this camper"
+        );
+      }
+      // The path is stamped into Stripe metadata and written to on
+      // fulfilment; a camper that does not exist would take the payment and
+      // then fail the webhook (no pre-registration, retries for days).
+      if (!(await camperDoc.get()).exists) {
+        throw new HttpsError(
+          "not-found",
+          `Camper ${camperDoc.id} was not found in your family`
         );
       }
     }

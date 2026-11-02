@@ -1,9 +1,9 @@
 import React from "react"
 import dayjs, { Dayjs } from "dayjs"
-import { getServerDate } from "@nodeguy/server-date"
 import { Grid, CircularProgress } from "@mui/material"
 
 import AuthContext from "@components/Auth/AuthContext"
+import { getServerNow } from "@utils/serverTime"
 
 type TimeGatedProps = React.PropsWithChildren<{
   hideAfterDateTime: Dayjs
@@ -11,6 +11,8 @@ type TimeGatedProps = React.PropsWithChildren<{
   forceHide?: boolean
   allowAdmin?: boolean
   allowEmails?: string[]
+  /** Caller already established that this viewer may pass (e.g. useRegistrationBypass). */
+  allowBypass?: boolean
 }>
 
 // Because this time can be duped by changing the computer's system clock,
@@ -22,11 +24,13 @@ export default function TimeGated({
   forceHide = false,
   allowAdmin = false,
   allowEmails = [],
+  allowBypass = false,
   children,
 }: TimeGatedProps) {
   const { isAdmin, user } = React.useContext(AuthContext)
   const userEmailLower = user?.email?.toLowerCase() ?? ""
   const shouldBypassTimeGate =
+    allowBypass ||
     (allowAdmin && isAdmin) ||
     allowEmails.some((e) => e.toLowerCase() === userEmailLower)
   const [isHidden, setIsHidden] = React.useState(
@@ -35,7 +39,9 @@ export default function TimeGated({
   const [isLoading, setIsLoading] = React.useState(true)
   React.useEffect(() => {
     const checkTime = async () => {
-      const { date } = await getServerDate()
+      // Shared, sampled once per session; the local clock is the fallback
+      // (which is also what getServerDate() returned when every sample failed).
+      const date = await getServerNow().catch(() => new Date())
 
       if (!forceHide && typeof window !== "undefined") {
         setIsHidden(
@@ -46,7 +52,8 @@ export default function TimeGated({
       setIsLoading(false)
     }
     checkTime()
-  }, [hideAfterDateTime])
+    // Re-evaluate when the bypass decision arrives after sign-in.
+  }, [forceHide, hideAfterDateTime, shouldBypassTimeGate])
 
   return (
     <>

@@ -3,7 +3,24 @@ rules_version = '2';
 // Role checks in this file mirror ROLE_CAPABILITIES in schemas/src/admin.ts —
 // rules cannot import TS, so when a role or capability changes there, update
 // the corresponding hasRole/hasAnyRole calls here and keep validRoles() in sync.
-// The matrix is enforced by firestore-rules-tests/ (run against the emulator).
+// Capabilities that are only exercised through callables (manageAdmins,
+// manageCampYear, manageWaitlist) have no rule here: the matching collections
+// (admins/, camps/{year} itself, config/) deny every client write and the
+// function enforces the capability with assertAdmin. The matrix is enforced by
+// firestore-rules-tests/ (run against the emulator).
+//
+// Role groups used below (each mirrors a ROLE_CAPABILITIES column):
+//   readHealth        health_staff, program_admin, full_admin
+//   readDemographics  every admin role
+//   writeRegistrations program_staff, program_admin (operational fields),
+//                     full_admin (unrestricted)
+//   managePayments    program_staff, program_admin, full_admin (read; the
+//                     functions write payments/)
+//   manageCredits     program_staff, program_admin, full_admin
+//   createTestData    program_staff, program_admin, full_admin — and only in
+//                     the test database, see canSeedTestData()
+// Unrestricted client writes (create/delete families, campers and
+// registrations, edit private/ docs) stay full_admin only.
 service cloud.firestore {
   match /databases/{database}/documents {
     // ---------- Identity helpers ----------
@@ -23,7 +40,7 @@ service cloud.firestore {
     // ---------- Admin role helpers ----------
 
     function validRoles() {
-      return ['full_admin', 'program_staff', 'health_staff'];
+      return ['full_admin', 'program_admin', 'program_staff', 'health_staff'];
     }
 
     function adminDocPath() {
@@ -62,6 +79,23 @@ service cloud.firestore {
       return hasRole('full_admin');
     }
 
+    // ---------- Test-data helpers ----------
+
+    // These rules are deployed unchanged to both databases; `database` is the
+    // one the request targets, so this is how a rule tells them apart.
+    function isTestDatabase() {
+      return database == 'lyf-v2-test';
+    }
+
+    // createTestData capability: the Create Test Data tab seeds and deletes
+    // families, parents, campers and registrations straight from the browser.
+    // Roles with the capability may do that in the test database only; the
+    // same writes in production remain full_admin only.
+    function canSeedTestData() {
+      return isTestDatabase() &&
+        hasAnyRole(['program_staff', 'program_admin', 'full_admin']);
+    }
+
     // ---------- Family ownership helpers ----------
 
     function familyEmails(familyId) {
@@ -81,6 +115,84 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(keys);
     }
 
+    // ---------- Field shape helpers ----------
+    // The functions validate every document they write through the schemas
+    // package. These give the handful of fields parents write straight from
+    // the website the same floor: the right type and a sane size, so a map
+    // or a megabyte cannot land where the admin grid expects a short string.
+    // `keys` is the set of keys to check — every key on a create, only the
+    // changed keys on an update — so a legacy value in an untouched field
+    // never blocks an unrelated edit. null is accepted wherever text is.
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // Keys to check for a create-or-update rule: resource is null on create.
+    function writtenKeys() {
+      return resource == null ? request.resource.data.keys() : changedKeys();
+    }
+
+    function textOk(d, keys, key, max) {
+      return !(key in keys) || !(key in d) || d[key] == null ||
+        (d[key] is string && d[key].size() <= max);
+    }
+
+    function boolOk(d, keys, key) {
+      return !(key in keys) || !(key in d) || d[key] is bool;
+    }
+
+    function timestampOk(d, keys, key) {
+      return !(key in keys) || !(key in d) || d[key] == null ||
+        d[key] is timestamp;
+    }
+
+    function listOk(d, keys, key, max) {
+      return !(key in keys) || !(key in d) ||
+        (d[key] is list && d[key].size() <= max);
+    }
+
+    function mapOk(d, keys, key) {
+      return !(key in keys) || !(key in d) || d[key] is map;
+    }
+
+    // Mirrors the camper profile fields in schemas/src/validation.ts.
+    function camperProfileShapeOk(d, keys) {
+      return textOk(d, keys, 'firstName', 200) &&
+        textOk(d, keys, 'lastName', 200) &&
+        textOk(d, keys, 'preferredName', 200) &&
+        textOk(d, keys, 'birthDate', 50) &&
+        listOk(d, keys, 'gender', 20) &&
+        textOk(d, keys, 'pronouns', 200) &&
+        textOk(d, keys, 'email', 320) &&
+        boolOk(d, keys, 'returning');
+    }
+
+    function camperHealthShapeOk(d, keys) {
+      return textOk(d, keys, 'dietAndFoodAllergies', 5000) &&
+        textOk(d, keys, 'medicalConditions', 5000);
+    }
+
+    function familyAddressShapeOk(d, keys) {
+      return textOk(d, keys, 'street', 200) &&
+        textOk(d, keys, 'suite', 200) &&
+        textOk(d, keys, 'city', 200) &&
+        textOk(d, keys, 'state', 200) &&
+        textOk(d, keys, 'zip', 50) &&
+        textOk(d, keys, 'country', 200) &&
+        mapOk(d, keys, 'household');
+    }
+
+    // The registration fields the profile page and camper checkout write.
+    function parentRegistrationShapeOk(d, keys) {
+      return textOk(d, keys, 'shirtSize', 50) &&
+        textOk(d, keys, 'additionalNotes', 5000) &&
+        boolOk(d, keys, 'isCheckedOut') &&
+        textOk(d, keys, 'nameOfParentCheckedOut', 200) &&
+        timestampOk(d, keys, 'checkedOutTime') &&
+        timestampOk(d, keys, 'updatedAt');
+    }
+
     // Fields a parent may set on their own camper. Health and demographics
     // are deliberately absent — they live under private/ and are gated there.
     function camperProfileKeys() {
@@ -93,6 +205,9 @@ service cloud.firestore {
     // Read-only from the client. All roster mutations go through the
     // manageAdmin callable (Admin SDK bypasses rules) so the last-full_admin
     // guard and the audit log cannot be skipped.
+    // These rules are deployed to both databases and get() cannot cross
+    // databases, so the test database holds a copy of the roster kept in
+    // sync by the replicateAdminsToTest trigger.
     match /admins/{email} {
       // Any signed-in user can read their own admin doc (how the client
       // learns its role)
@@ -106,29 +221,32 @@ service cloud.firestore {
 
     match /families/{familyId} {
       allow read: if isAnyAdmin() || isMemberOfResourceFamily();
-      allow create, delete: if isFullAdmin();
+      allow create, delete: if isFullAdmin() || canSeedTestData();
       // Family members may edit address/household details only. `emails`
       // (membership) and `registrations` are function-managed.
-      allow update: if isFullAdmin() ||
+      allow update: if isFullAdmin() || canSeedTestData() ||
         (isMemberOfResourceFamily() &&
-          onlyUpdates(['street', 'suite', 'city', 'state', 'zip', 'country', 'household']));
+          onlyUpdates(['street', 'suite', 'city', 'state', 'zip', 'country', 'household']) &&
+          familyAddressShapeOk(request.resource.data, changedKeys()));
 
       match /parents/{parentId} {
         allow read: if isAnyAdmin() || isFamilyMember(familyId);
-        allow write: if isFullAdmin();
+        allow write: if isFullAdmin() || canSeedTestData();
       }
 
       match /campers/{camperId} {
         allow read: if isAnyAdmin() || isFamilyMember(familyId);
-        allow write: if isFullAdmin();
+        allow write: if isFullAdmin() || canSeedTestData();
         // Parents may add campers and edit profile fields. A new camper
         // cannot arrive with registrations attached.
         allow create: if isFamilyMember(familyId) &&
           request.resource.data.keys().hasOnly(camperProfileKeys()) &&
           (!('registrations' in request.resource.data) ||
-            request.resource.data.registrations.size() == 0);
+            request.resource.data.registrations.size() == 0) &&
+          camperProfileShapeOk(request.resource.data, request.resource.data.keys());
         allow update: if isFamilyMember(familyId) &&
-          onlyUpdates(camperProfileKeys().removeAll(['registrations', 'schemaVersion']));
+          onlyUpdates(camperProfileKeys().removeAll(['registrations', 'schemaVersion'])) &&
+          camperProfileShapeOk(request.resource.data, changedKeys());
 
         // Private sub-documents — one match for every sensitive section.
         // Section gates mirror PRIVATE_SECTIONS in schemas/src/families.ts:
@@ -136,33 +254,60 @@ service cloud.firestore {
         match /private/{section} {
           allow read: if
             (section == 'health' &&
-              (hasAnyRole(['health_staff', 'full_admin']) || isFamilyMember(familyId))) ||
-            (section == 'demographics' && isFullAdmin());
+              (hasAnyRole(['health_staff', 'program_admin', 'full_admin']) ||
+                isFamilyMember(familyId))) ||
+            (section == 'demographics' && isAnyAdmin());
           allow write: if isFullAdmin();
           // Parents own their child's health info and may keep it current.
           allow create, update: if section == 'health' &&
             isFamilyMember(familyId) &&
-            request.resource.data.keys().hasOnly(['dietAndFoodAllergies', 'medicalConditions']);
+            request.resource.data.keys().hasOnly(['dietAndFoodAllergies', 'medicalConditions']) &&
+            camperHealthShapeOk(request.resource.data, writtenKeys());
         }
       }
     }
 
+    // ---------- Site config & camp years ----------
+
+    // Which camp year the site is registering / pre-registering for. Read by
+    // the time gates before sign-in, so it must be public. Written only by the
+    // manageCampYear callable (manageCampYear capability).
+    match /config/site {
+      allow read: if true;
+      allow write: if false;
+    }
+
     // ---------- Camp years & registrations ----------
 
-    // Any signed-in user can read camp info (pricing, dates, remaining spots)
+    // Camp info (dates, pricing, remaining spots) is public: the registration
+    // and pre-registration pages decide whether they are open from these dates
+    // before the visitor signs in. Nothing personal may live on this document.
+    // Writes go through the manageCampYear callable (dates/fees/caps) and the
+    // registration functions (remainingSpots).
     match /camps/{campYear} {
-      allow read: if isSignedIn();
-      allow write: if isFullAdmin();
+      allow read: if true;
+      allow write: if false;
+
+      // Registration-close bypass list, one document per email so a parent
+      // can confirm only their own extension and never enumerate the list.
+      // Admins may list it (the Camp Year tab); manageCampYear writes it.
+      match /private/bypass/emails/{email} {
+        allow read: if isAnyAdmin() || (hasEmail() && callerEmail() == email);
+        allow write: if false;
+      }
+
+      // Any other camps/{year}/private/* path falls through to the root
+      // catch-all: full_admin may inspect, nobody writes from the client.
 
       match /registrations/{registrationId} {
         allow read: if isAnyAdmin() ||
           (hasEmail() && callerEmail() in resource.data.familyEmails);
-        allow create, delete: if isFullAdmin();
-        allow update: if isFullAdmin();
-        // writeRegistrations capability: program_staff may edit the
-        // operational fields the admin console exposes, nothing structural
-        // (camper ref, payments, familyEmails, waiver, pricing state).
-        allow update: if hasRole('program_staff') &&
+        allow create, delete: if isFullAdmin() || canSeedTestData();
+        allow update: if isFullAdmin() || canSeedTestData();
+        // writeRegistrations capability: program_staff and program_admin may
+        // edit the operational fields the admin console exposes, nothing
+        // structural (camper ref, payments, familyEmails, waiver, pricing state).
+        allow update: if hasAnyRole(['program_staff', 'program_admin']) &&
           onlyUpdates(['status', 'internalNotes', 'hasContacted', 'isCheckedOut',
                        'nameOfParentCheckedOut', 'checkedOutTime', 'smallGroup',
                        'cabinPreference', 'updatedAt']);
@@ -170,18 +315,25 @@ service cloud.firestore {
         allow update: if hasEmail() &&
           callerEmail() in resource.data.familyEmails &&
           onlyUpdates(['shirtSize', 'additionalNotes', 'isCheckedOut',
-                       'nameOfParentCheckedOut', 'checkedOutTime', 'updatedAt']);
+                       'nameOfParentCheckedOut', 'checkedOutTime', 'updatedAt']) &&
+          parentRegistrationShapeOk(request.resource.data, changedKeys());
       }
     }
 
     // ---------- Money ----------
 
+    // managePayments capability. The Payments tab only reads from the
+    // browser; payment records are written by the Stripe webhook and the
+    // refund callable, so client writes stay full_admin only.
     match /payments/{paymentId} {
-      allow read, write: if isFullAdmin();
+      allow read: if hasAnyRole(['program_staff', 'program_admin', 'full_admin']);
+      allow write: if isFullAdmin();
     }
 
+    // manageCredits capability: the Camp Credits tab reads and writes a
+    // family's credit document directly.
     match /credits/{familyId} {
-      allow read, write: if isFullAdmin();
+      allow read, write: if hasAnyRole(['program_staff', 'program_admin', 'full_admin']);
     }
 
     // ---------- Everything else ----------

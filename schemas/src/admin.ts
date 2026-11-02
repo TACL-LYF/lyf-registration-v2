@@ -8,7 +8,12 @@ export type TimestampLike = {
   toMillis(): number
 }
 
-export const ADMIN_ROLES = ["full_admin", "program_staff", "health_staff"] as const
+export const ADMIN_ROLES = [
+  "full_admin",
+  "program_admin",
+  "program_staff",
+  "health_staff",
+] as const
 
 export type AdminRole = (typeof ADMIN_ROLES)[number]
 
@@ -30,6 +35,7 @@ export type Admin = Partial<{
  * with this map, enforced by the rules unit tests).
  */
 export const ROLE_CAPABILITIES = {
+  // Everything, including the admin roster and unrestricted Firestore writes.
   full_admin: {
     readHealth: true,
     readDemographics: true,
@@ -39,26 +45,47 @@ export const ROLE_CAPABILITIES = {
     manageAdmins: true,
     manageWaitlist: true,
     createTestData: true,
+    manageCampYear: true,
   },
+  // full_admin minus the admin roster. Sees health data and runs the yearly
+  // camp-year rollover. Firestore writes stay operational (same field list as
+  // program_staff): creating or deleting families, campers and registrations
+  // from the client remains full_admin only.
+  program_admin: {
+    readHealth: true,
+    readDemographics: true,
+    writeRegistrations: true,
+    managePayments: true,
+    manageCredits: true,
+    manageAdmins: false,
+    manageWaitlist: true,
+    createTestData: true,
+    manageCampYear: true,
+  },
+  // Day-to-day operations: everything except health data, the camp-year
+  // rollover and the admin roster.
   program_staff: {
     readHealth: false,
-    readDemographics: false,
+    readDemographics: true,
     writeRegistrations: true,
-    managePayments: false,
-    manageCredits: false,
+    managePayments: true,
+    manageCredits: true,
     manageAdmins: false,
-    manageWaitlist: false,
-    createTestData: false,
+    manageWaitlist: true,
+    createTestData: true,
+    manageCampYear: false,
   },
+  // Read-only view of everything, including health data.
   health_staff: {
     readHealth: true,
-    readDemographics: false,
+    readDemographics: true,
     writeRegistrations: false,
     managePayments: false,
     manageCredits: false,
     manageAdmins: false,
     manageWaitlist: false,
     createTestData: false,
+    manageCampYear: false,
   },
 } as const satisfies Record<AdminRole, Record<string, boolean>>
 
@@ -117,3 +144,23 @@ export type AdminAuditLogEntry = {
   after: Admin | null
   at: TimestampLike
 }
+
+// Also stored at: adminAuditLog/{autoId}, written by the manageCampYear
+// callable. `target` is the document path ("camps/2027", "config/site") and
+// `database` says which data set (prod or test) the write went to.
+export type CampYearAuditLogEntry = {
+  actor: string
+  action:
+    | "createYear"
+    | "updateYear"
+    | "setSiteConfig"
+    | "copyYearFromProd"
+    | "copySiteConfigFromProd"
+  target: string
+  database: string
+  before: Record<string, unknown> | null
+  after: Record<string, unknown> | null
+  at: TimestampLike
+}
+
+export type AuditLogEntry = AdminAuditLogEntry | CampYearAuditLogEntry
